@@ -1,0 +1,9 @@
+src/services/api-client.ts(6,1): error TS1128: Declaration or statement expected.
+src/services/api-client.ts(7,1): error TS1128: Declaration or statement expected.
+src/services/api-client.ts(7,53): error TS1109: Expression expected.
+src/services/api-client.ts(7,55): error TS1011: An element access expression should take an argument.
+src/services/api-client.ts(9,1): error TS1128: Declaration or statement expected.
+src/services/api-client.ts(9,28): error TS1005: ';' expected.
+src/services/api-client.ts(11,7): error TS1005: ':' expected.
+src/services/api-client.ts(23,3): error TS1005: ',' expected.
+src/services/api-client.ts(23,7): error TS1005: ':' expected.
