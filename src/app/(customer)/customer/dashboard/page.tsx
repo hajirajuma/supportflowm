@@ -38,33 +38,46 @@ export default function CustomerDashboardPage() {
   const statCards = [
     {
       title: 'Open Tickets',
-      value: stats.openTickets,
+      value: stats.ticketStats.open,
       icon: Ticket,
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
     },
     {
       title: 'Pending Tickets',
-      value: stats.pendingTickets,
+      value: stats.ticketStats.byStatus['WAITING_FOR_CUSTOMER'] ?? 0,
       icon: Clock,
       color: 'text-warning',
       bg: 'bg-warning/10',
     },
     {
       title: 'Resolved Tickets',
-      value: stats.resolvedTickets,
+      value: stats.ticketStats.resolved,
       icon: TicketCheck,
       color: 'text-success',
       bg: 'bg-success/10',
     },
     {
       title: 'Pending Feedback',
-      value: stats.pendingFeedback,
+      value: stats.pendingFeedbackRequests.length,
       icon: Star,
       color: 'text-primary',
       bg: 'bg-primary/10',
     },
   ]
+
+  // The backend reports each recent ticket as an activity entry; resolved
+  // ones surface as the "ticket_resolved" icon, everything else as a new
+  // ticket so the feed always has a recognizable entry.
+  const recentActivities = stats.recentTickets.map((ticket) => ({
+    id: ticket.id,
+    type:
+      ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'
+        ? 'ticket_resolved'
+        : 'ticket_created',
+    description: `Ticket #${ticket.ticketNumber}: ${ticket.subject}`,
+    timestamp: ticket.createdAt,
+  }))
 
   return (
     <div className="space-y-6">
@@ -72,10 +85,10 @@ export default function CustomerDashboardPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold">
-            Welcome back, {profile.user.firstName}
+            Welcome back, {profile.firstName}
           </h1>
           <p className="text-muted-foreground">
-            {profile.organization.name} Support Portal
+            {stats.organization.name} Support Portal
           </p>
         </div>
         <Link href="/customer/tickets/new">
@@ -141,12 +154,12 @@ export default function CustomerDashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats.recentActivities.length === 0 ? (
+            {recentActivities.length === 0 ? (
               <p className="text-center text-muted-foreground">
                 No recent activity
               </p>
             ) : (
-              stats.recentActivities.slice(0, 5).map((activity) => (
+              recentActivities.slice(0, 5).map((activity) => (
                 <div
                   key={activity.id}
                   className="flex items-start gap-3 border-b pb-3 last:border-0"

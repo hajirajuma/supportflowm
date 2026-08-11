@@ -11,6 +11,8 @@ import {
   UpdateDepartmentRequest,
   InviteMemberRequest,
   UpdateMemberRequest,
+  Organization,
+  OrganizationSettings,
 } from '@/types/organization'
 
 export const ORG_QUERY_KEYS = {
@@ -34,10 +36,10 @@ export function useOrganization() {
     refetch: refetchOrg,
   } = useQuery({
     queryKey: ORG_QUERY_KEYS.organization,
-    queryFn: () => organizationService.getOrganization(),
-    onSuccess: (data) => {
+    queryFn: () => organizationService.getOrganization().then((data) => {
       setOrganization(data)
-    },
+      return data
+    }),
   })
 
   // Get stats
@@ -58,10 +60,10 @@ export function useOrganization() {
     refetch: refetchSettings,
   } = useQuery({
     queryKey: ORG_QUERY_KEYS.settings,
-    queryFn: () => organizationService.getSettings(),
-    onSuccess: (data) => {
+    queryFn: () => organizationService.getSettings().then((data) => {
       setSettings(data)
-    },
+      return data
+    }),
   })
 
   // Update organization
@@ -234,6 +236,10 @@ export function useOrganization() {
     return useQuery({
       queryKey: [...ORG_QUERY_KEYS.invitations, params],
       queryFn: () => organizationService.getInvitations(params),
+      // Keep the list fresh so invitations accepted by customers/support
+      // agents elsewhere stop showing as "pending" without a manual refresh.
+      refetchInterval: 30000,
+      refetchOnWindowFocus: true,
     })
   }
 
@@ -241,9 +247,15 @@ export function useOrganization() {
   const sendInvitationMutation = useMutation({
     mutationFn: (data: InviteMemberRequest) =>
       organizationService.sendInvitation(data),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ORG_QUERY_KEYS.invitations })
-      toast.success('Invitation sent successfully')
+      if (data?.emailDelivered === false) {
+        toast.warning(
+          'Invitation created, but the email could not be sent. Use the copy-link action to share the invite manually.'
+        )
+      } else {
+        toast.success('Invitation sent successfully')
+      }
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to send invitation')

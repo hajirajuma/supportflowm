@@ -47,9 +47,8 @@ export const customerService = {
     search?: string
     status?: string
     priority?: string
-    category?: string
+    categoryId?: string
     sort?: string
-    order?: 'asc' | 'desc'
   }): Promise<{ data: Ticket[]; total: number; page: number; limit: number }> {
     const query: Record<string, string | number | undefined> = {
       page: params?.page,
@@ -57,9 +56,8 @@ export const customerService = {
       search: params?.search,
       status: params?.status,
       priority: params?.priority,
-      categoryId: params?.category,
+      categoryId: params?.categoryId,
       sort: params?.sort,
-      order: params?.order,
     }
     const clean: Record<string, string | number> = {}
     for (const [key, value] of Object.entries(query)) {
@@ -78,24 +76,32 @@ export const customerService = {
     return apiClient.post<Ticket>('/tickets', {
       subject: data.title,
       description: data.description,
-      categoryId: data.category,
       priority: data.priority,
     })
   },
 
   async updateTicket(id: string, data: UpdateTicketRequest): Promise<Ticket> {
     return apiClient.patch<Ticket>(`/tickets/${id}`, {
-      subject: data.title,
+      subject: data.subject,
       description: data.description,
       status: data.status,
       priority: data.priority,
-      categoryId: data.category,
     })
   },
 
   // Replies
-  async getReplies(ticketId: string): Promise<TicketReply[]> {
-    return apiClient.get<TicketReply[]>(`/tickets/${ticketId}/replies`)
+  async getReplies(ticketId: string): Promise<{
+    data: TicketReply[]
+    total: number
+    page: number
+    limit: number
+  }> {
+    return apiClient.get<{
+      data: TicketReply[]
+      total: number
+      page: number
+      limit: number
+    }>(`/tickets/${ticketId}/replies`)
   },
 
   async createReply(ticketId: string, data: CreateReplyRequest): Promise<TicketReply> {

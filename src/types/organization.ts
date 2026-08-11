@@ -4,7 +4,7 @@ export type OrganizationRole = 'tenant_owner' | 'support_agent' | 'customer'
 
 export type MemberStatus = 'active' | 'inactive' | 'pending' | 'suspended'
 
-export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'rejected'
+export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'rejected' | 'revoked'
 
 export interface Organization {
   id: string
@@ -56,6 +56,8 @@ export interface Department {
 export interface Invitation {
   id: string
   email: string
+  /** Random secret used in the /accept-invitation?token= link. */
+  token?: string
   role: OrganizationRole
   departmentId?: string
   message?: string

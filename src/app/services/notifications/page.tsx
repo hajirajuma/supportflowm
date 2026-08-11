@@ -8,21 +8,47 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { useState } from 'react'
+import { NotificationPreferences } from '@/types/notification'
 
 export default function NotificationPreferencesPage() {
   const { preferences, isLoadingPreferences, updatePreferences, isUpdatingPreferences } =
     useNotifications()
 
-  const [localPreferences, setLocalPreferences] = useState(preferences)
+  const [localPreferences, setLocalPreferences] = useState<NotificationPreferences | undefined>(
+    preferences
+  )
 
   const handleToggle = (category: 'email' | 'inApp' | 'communication', key: string) => {
-    setLocalPreferences((prev) => ({
-      ...prev,
-      [category]: {
-        ...prev?.[category],
-        [key]: !prev?.[category]?.[key],
-      },
-    }))
+    setLocalPreferences((prev) => {
+      const current: NotificationPreferences = prev ?? {
+        email: {
+          ticketCreated: false,
+          ticketUpdated: false,
+          ticketResolved: false,
+          newReply: false,
+          feedbackReceived: false,
+          messageReceived: false,
+        },
+        inApp: {
+          ticketUpdates: false,
+          replies: false,
+          feedback: false,
+          systemAlerts: false,
+        },
+        communication: {
+          productUpdates: false,
+          announcements: false,
+        },
+      }
+      const group = current[category] as Record<string, boolean>
+      return {
+        ...current,
+        [category]: {
+          ...group,
+          [key]: !group[key],
+        },
+      } as NotificationPreferences
+    })
   }
 
   const handleSave = async () => {

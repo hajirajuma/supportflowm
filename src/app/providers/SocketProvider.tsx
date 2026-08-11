@@ -19,14 +19,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    if (!accessToken) {
-      socketManager.disconnect()
-      setIsConnected(false)
-      return
-    }
-
-    socketManager.connect()
     const unsubscribe = socketManager.onConnectionChange(setIsConnected)
+
+    if (accessToken) {
+      socketManager.connect()
+    } else {
+      socketManager.disconnect()
+    }
 
     return () => {
       unsubscribe()

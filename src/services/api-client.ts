@@ -35,7 +35,17 @@ interface NormalizedEnvelope<T> {
 function normalizeResponse<T>(body: unknown): T {
   let payload: any = body
 
-  if (payload && typeof payload === 'object' && 'success' in payload && 'data' in payload) {
+  // The backend wraps every handler result in { success, data } and some
+  // handlers (auth, organizations) additionally return { success, message,
+  // data }, producing a nested envelope. Unwrap each level, but stop at a
+  // null data so message-bearing responses (e.g. changePassword) survive.
+  while (
+    payload &&
+    typeof payload === 'object' &&
+    'success' in payload &&
+    'data' in payload &&
+    payload.data !== null
+  ) {
     payload = payload.data
   }
 

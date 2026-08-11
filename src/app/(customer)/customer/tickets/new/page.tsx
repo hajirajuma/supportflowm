@@ -28,13 +28,14 @@ import { FileUpload } from '@/components/ui/file-upload'
 import { cn } from '@/lib/utils'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { TicketCategory, TicketPriority } from '@/types/customer'
+import { TicketPriority } from '@/types/customer'
 
+// Priority values match the backend contract exactly (Prisma enum:
+// LOW/MEDIUM/HIGH/URGENT). The UI shows friendly labels.
 const ticketSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters'),
   description: z.string().min(20, 'Description must be at least 20 characters'),
-  category: z.enum(['technical', 'billing', 'feature_request', 'bug_report', 'general']),
-  priority: z.enum(['low', 'medium', 'high', 'critical']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
 })
 
 type TicketFormValues = z.infer<typeof ticketSchema>
@@ -50,17 +51,18 @@ export default function CreateTicketPage() {
     handleSubmit,
     formState: { errors },
     setValue,
-    watch,
   } = useForm<TicketFormValues>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
-      category: 'general',
-      priority: 'medium',
+      priority: 'MEDIUM',
     },
   })
 
   const onSubmit = async (data: TicketFormValues) => {
     try {
+      // mutateAsync resolves only after the backend created the ticket; the
+      // mutation already shows the success toast and invalidates the ticket
+      // list/stats queries so the new ticket appears with its status.
       await createTicket({
         ...data,
         attachments,
@@ -112,7 +114,7 @@ export default function CreateTicketPage() {
         <div>
           <h1 className="text-3xl font-bold">Create Ticket</h1>
           <p className="text-muted-foreground">
-            Describe your issue and we'll help you solve it
+            Describe your issue and we&apos;ll help you solve it
           </p>
         </div>
       </div>
@@ -139,49 +141,25 @@ export default function CreateTicketPage() {
               )}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  onValueChange={(value) => setValue('category', value as TicketCategory)}
-                  defaultValue="general"
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="technical">Technical Issue</SelectItem>
-                    <SelectItem value="billing">Billing</SelectItem>
-                    <SelectItem value="feature_request">Feature Request</SelectItem>
-                    <SelectItem value="bug_report">Bug Report</SelectItem>
-                    <SelectItem value="general">General</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.category && (
-                  <p className="text-sm text-destructive">{errors.category.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  onValueChange={(value) => setValue('priority', value as TicketPriority)}
-                  defaultValue="medium"
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.priority && (
-                  <p className="text-sm text-destructive">{errors.priority.message}</p>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select
+                onValueChange={(value) => setValue('priority', value as TicketPriority)}
+                defaultValue="MEDIUM"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="URGENT">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.priority && (
+                <p className="text-sm text-destructive">{errors.priority.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">

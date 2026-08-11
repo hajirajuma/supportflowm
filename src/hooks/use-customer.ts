@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { customerService } from '@/services/customer.service'
 import { useCustomerStore } from '@/store/customer-store'
-import { CreateTicketRequest, CreateReplyRequest, UpdateTicketRequest } from '@/types/customer'
+import { CreateTicketRequest, CreateReplyRequest, UpdateTicketRequest, CustomerProfile } from '@/types/customer'
 
 export const CUSTOMER_QUERY_KEYS = {
   profile: ['customer', 'profile'],
@@ -33,8 +33,10 @@ export function useCustomer() {
     refetch: refetchProfile,
   } = useQuery({
     queryKey: CUSTOMER_QUERY_KEYS.profile,
-    queryFn: () => customerService.getProfile(),
-    onSuccess: (data) => setProfile(data),
+    queryFn: () => customerService.getProfile().then((data) => {
+      setProfile(data)
+      return data
+    }),
   })
 
   // Stats
@@ -259,7 +261,7 @@ export function useCustomer() {
     // Tickets
     useTickets,
     useTicket,
-    createTicket: createTicketMutation.mutate,
+    createTicket: createTicketMutation.mutateAsync,
     isCreatingTicket: createTicketMutation.isPending,
     updateTicket: updateTicketMutation.mutate,
     isUpdatingTicket: updateTicketMutation.isPending,

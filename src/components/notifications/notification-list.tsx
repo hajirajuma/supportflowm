@@ -99,7 +99,7 @@ export function NotificationList({
         <Bell className="h-12 w-12 text-muted-foreground" />
         <p className="mt-2 text-sm text-muted-foreground">No notifications</p>
         <p className="text-xs text-muted-foreground">
-          You're all caught up!
+          You&apos;re all caught up!
         </p>
       </div>
     )

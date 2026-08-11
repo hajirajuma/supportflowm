@@ -21,6 +21,9 @@ interface DataTableProps<TData, TValue> {
   onPageChange?: (page: number) => void
   onRowClick?: (row: TData) => void
   isLoading?: boolean
+  total?: number
+  page?: number
+  limit?: number
 }
 
 export function DataTable<TData, TValue>({
@@ -31,6 +34,9 @@ export function DataTable<TData, TValue>({
   onPageChange,
   onRowClick,
   isLoading = false,
+  total,
+  page,
+  limit,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -40,6 +46,10 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   })
+
+  const computedPage = page ?? currentPage
+  const computedPageCount =
+    pageCount ?? (total !== undefined && limit ? Math.max(1, Math.ceil(total / limit)) : undefined)
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-8">Loading...</div>
@@ -98,25 +108,25 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {(pageCount && onPageChange) && (
+      {(computedPageCount && onPageChange) && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
-            Page {currentPage} of {pageCount}
+            Page {computedPage} of {computedPageCount}
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
+              onClick={() => onPageChange(computedPage - 1)}
+              disabled={computedPage <= 1}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage >= pageCount}
+              onClick={() => onPageChange(computedPage + 1)}
+              disabled={computedPage >= computedPageCount}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

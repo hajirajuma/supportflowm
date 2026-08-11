@@ -10,15 +10,70 @@ import {
   RefreshTokenResponse,
   User,
   InvitationData,
+   RegisterRequest,
+  RegisterResponse,
+  SubdomainAvailabilityResponse
 } from '@/types/auth'
 
+
+
 const AUTH_BASE = '/auth'
+
+function toUserRole(role: string | undefined): User['roles'] {
+  const normalized = (role ?? 'guest').toLowerCase()
+  const valid: User['roles'][number][] = [
+    'platform_admin',
+    'tenant_owner',
+    'support_agent',
+    'customer',
+    'guest',
+  ]
+  return valid.includes(normalized as any) ? [normalized as any] : ['guest']
+}
+
+function mapUser(backendUser: any): User {
+  const role = backendUser?.role ?? backendUser?.roles?.[0]
+  const firstName = backendUser?.firstName ?? ''
+  const lastName = backendUser?.lastName ?? ''
+  return {
+    id: backendUser?.id ?? '',
+    email: backendUser?.email ?? '',
+    firstName,
+    lastName,
+   fullName: (`${firstName} ${lastName}`.trim() || backendUser?.email) ?? '',
+    avatar: backendUser?.avatarUrl || backendUser?.avatar || undefined,
+    roles: toUserRole(role),
+    permissions: backendUser?.permissions ?? [],
+    organization:
+      backendUser?.organization ??
+      (backendUser?.organizationId
+        ? { id: backendUser.organizationId, name: '', slug: '' }
+        : undefined),
+    tenantId: backendUser?.organizationId ?? backendUser?.tenantId,
+    emailVerified: !!backendUser?.emailVerifiedAt || !!backendUser?.emailVerified,
+    isActive:
+      backendUser?.status === 'ACTIVE' ||
+      backendUser?.isActive === true ||
+      !backendUser?.status,
+    createdAt: backendUser?.createdAt ?? new Date().toISOString(),
+    updatedAt: backendUser?.updatedAt ?? new Date().toISOString(),
+  }
+}
+
+function mapAuthResponse(raw: any): AuthResponse {
+  return {
+    accessToken: raw?.accessToken ?? '',
+    refreshToken: raw?.refreshToken ?? '',
+    expiresIn: raw?.expiresIn ?? 15 * 60,
+    user: mapUser(raw?.user),
+  }
+}
 
 export const authService = {
   // Login
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>(`${AUTH_BASE}/login`, credentials)
-    return response
+    const response = await apiClient.post<any>(`${AUTH_BASE}/login`, credentials)
+    return mapAuthResponse(response)
   },
 
   // Logout
@@ -53,12 +108,9 @@ export const authService = {
   },
 
   // Verify Email
-  async verifyEmail(data: VerifyEmailRequest): Promise<{ message: string }> {
-    const response = await apiClient.post<{ message: string }>(
-      `${AUTH_BASE}/verify-email`,
-      data
-    )
-    return response
+  async verifyEmail(data: VerifyEmailRequest): Promise<AuthResponse> {
+    const response = await apiClient.post<any>(`${AUTH_BASE}/verify-email`, data)
+    return mapAuthResponse(response)
   },
 
   // Resend Verification Email
@@ -72,8 +124,8 @@ export const authService = {
 
   // Get Current User Profile
   async getProfile(): Promise<User> {
-    const response = await apiClient.get<User>(`${AUTH_BASE}/me`)
-    return response
+    const response = await apiClient.get<any>(`${AUTH_BASE}/me`)
+    return mapUser(response)
   },
 
   // Change Password
@@ -110,4 +162,29 @@ export const authService = {
     )
     return response
   },
+
+    // Register new organization
+  async register(data: RegisterRequest): Promise<RegisterResponse> {
+    const response = await apiClient.post<any>(`${AUTH_BASE}/register`, data)
+    return {
+      user: mapUser(response?.user),
+      organization: response?.organization ?? {
+        id: '',
+        name: data.organizationName,
+        subdomain: data.subdomain,
+      },
+      requiresEmailVerification: true,
+      message:
+        response?.message ??
+        'Organization registered successfully. Please verify your email address.',
+    }
+  },
+
+  // Check subdomain availability
+  async checkSubdomainAvailability(subdomain: string): Promise<SubdomainAvailabilityResponse> {
+    return apiClient.get<SubdomainAvailabilityResponse>(
+      `${AUTH_BASE}/subdomain-availability/${subdomain}`
+    )
+  },
+
 }

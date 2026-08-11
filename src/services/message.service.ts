@@ -57,4 +57,6 @@ export const messageService = {
 
   // Get unread count
   async getUnreadCount(): Promise<{ count: number }> {
-    return apiClient.get(`${MESSAGE_BASE}/unre
+    return apiClient.get(`${MESSAGE_BASE}/unread/count`)
+  },
+}

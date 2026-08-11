@@ -122,12 +122,26 @@ export const organizationService = {
     status?: string
     role?: string
   }): Promise<{ data: Invitation[]; total: number; page: number; limit: number }> {
-    return apiClient.get(`${ORG_BASE}/invitations`, { params })
+    const res = await apiClient.get<any>(`${ORG_BASE}/invitations`, { params })
+    const list = Array.isArray(res) ? res : res?.data ?? []
+    return {
+      data: list,
+      total: list.length,
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+    }
   },
 
   // Send invitation
   async sendInvitation(data: InviteMemberRequest): Promise<Invitation> {
-    return apiClient.post<Invitation>(`${ORG_BASE}/invitations`, data)
+    // Backend InviteUserDto expects the UPPERCASE role enum and only accepts
+    // email/role/message (forbidNonWhitelisted rejects unknown fields).
+    return apiClient.post<Invitation>(`${ORG_BASE}/invitations`, {
+      email: data.email,
+      role: data.role.toUpperCase(),
+      message: data.message,
+      expiresIn: data.expiresIn,
+    })
   },
 
   // Cancel invitation

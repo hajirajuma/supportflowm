@@ -120,7 +120,7 @@ export default function NotificationCenterPage() {
 
               <span className="text-sm text-muted-foreground self-center">
                 {data?.total || 0} notifications
-                {data?.unread > 0 && ` (${data.unread} unread)`}
+                {data && data.unread > 0 && ` (${data.unread} unread)`}
               </span>
             </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,7 +17,22 @@ import { Progress } from '@/components/ui/progress'
 import { cn, formatDate } from '@/lib/utils'
 import { InvitationData } from '@/types/auth'
 
-export default function AcceptInvitationPage() {
+/**
+ * Builds the login URL for the invited organization's tenant subdomain, e.g.
+ * https://acme.supportflow.com/login. The base domain comes from the current
+ * window host so both dev (http://acme.localhost:3000) and production
+ * (https://acme.supportflow.com) work; only the subdomain label is swapped,
+ * so the user always lands on the exact organization's login page.
+ */
+function getOrganizationLoginUrl(subdomain: string): string {
+  const { protocol, hostname, port } = window.location
+  const labels = hostname.toLowerCase().split('.')
+  const base = labels.length > 1 ? labels.slice(1).join('.') : labels[0]
+  const portSuffix = port ? `:${port}` : ''
+  return `${protocol}//${subdomain}.${base}${portSuffix}/login`
+}
+
+function AcceptInvitationPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -26,7 +41,6 @@ export default function AcceptInvitationPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState(0)
   const [isAccepted, setIsAccepted] = useState(false)
   const [isRejected, setIsRejected] = useState(false)
@@ -44,7 +58,6 @@ export default function AcceptInvitationPage() {
       firstName: '',
       lastName: '',
       password: '',
-      confirmPassword: '',
     },
   })
 
@@ -87,6 +100,17 @@ export default function AcceptInvitationPage() {
     setPasswordStrength(Math.min(strength, 100))
   }, [password])
 
+  // Once accepted, show the success card briefly, then send the user to the
+  // login page of the exact organization they were invited to.
+  useEffect(() => {
+    const subdomain = invitation?.subdomain
+    if (!isAccepted || !subdomain) return
+    const timer = setTimeout(() => {
+      window.location.assign(getOrganizationLoginUrl(subdomain))
+    }, 2500)
+    return () => clearTimeout(timer)
+  }, [isAccepted, invitation?.subdomain])
+
   const getPasswordStrengthColor = () => {
     if (passwordStrength < 30) return 'bg-destructive'
     if (passwordStrength < 60) return 'bg-warning'
@@ -96,7 +120,8 @@ export default function AcceptInvitationPage() {
 
   const onSubmit = async (data: AcceptInvitationFormValues) => {
     try {
-      await acceptInvitation(data)
+      const { confirmPassword, ...payload } = data
+      await acceptInvitation(payload)
       setIsAccepted(true)
     } catch (err: any) {
       setFormError('root', { message: err.message || 'Failed to accept invitation' })
@@ -150,13 +175,18 @@ export default function AcceptInvitationPage() {
     )
   }
 
+  if (!invitation) {
+    return null
+  }
+
   if (isAccepted) {
     return (
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl text-center text-success">Invitation Accepted!</CardTitle>
           <CardDescription className="text-center">
-            Welcome to SupportFlow! You'll be redirected shortly.
+            Welcome to {invitation.organizationName}! Your account is ready —
+            you&apos;ll be redirected to your organization&apos;s sign-in page shortly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -165,6 +195,14 @@ export default function AcceptInvitationPage() {
               <CheckCircle className="h-12 w-12 text-success" />
             </div>
           </div>
+          {!invitation.subdomain && (
+            <Button
+              className="mt-4 w-full"
+              onClick={() => window.location.assign('/login')}
+            >
+              Continue to sign in
+            </Button>
+          )}
         </CardContent>
       </Card>
     )
@@ -196,16 +234,12 @@ export default function AcceptInvitationPage() {
     )
   }
 
-  if (!invitation) {
-    return null
-  }
-
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader>
         <CardTitle className="text-2xl text-center">Accept Invitation</CardTitle>
         <CardDescription className="text-center">
-          You've been invited to join {invitation.organizationName}
+          You&apos;ve been invited to join {invitation.organizationName}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -235,13 +269,16 @@ export default function AcceptInvitationPage() {
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">
-              <strong>Expires:</strong> {formatDate(invitation.expiresAt)}
+              <strong>Expires:</strong>{' '}
+              {invitation.expiresAt ? formatDate(invitation.expiresAt) : '—'}
             </span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
-              <strong>Invited by:</strong> {invitation.invitedBy.firstName}{' '}
-              {invitation.invitedBy.lastName}
+              <strong>Invited by:</strong>{' '}
+              {invitation.invitedBy
+                ? `${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`
+                : '—'}
             </span>
           </div>
         </div>
@@ -333,8 +370,8 @@ export default function AcceptInvitationPage() {
             <div className="relative">
               <Input
                 id="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                placeholder="Confirm your password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Re-enter your password"
                 {...register('confirmPassword')}
                 className={cn(errors.confirmPassword && 'border-destructive')}
                 aria-invalid={!!errors.confirmPassword}
@@ -342,11 +379,11 @@ export default function AcceptInvitationPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 tabIndex={-1}
               >
-                {showConfirmPassword ? (
+                {showPassword ? (
                   <EyeOff className="h-4 w-4" />
                 ) : (
                   <Eye className="h-4 w-4" />
@@ -400,5 +437,13 @@ export default function AcceptInvitationPage() {
         </form>
       </CardContent>
     </Card>
+  )
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense fallback={null}>
+      <AcceptInvitationPageContent />
+    </Suspense>
   )
 }

@@ -65,9 +65,22 @@ export function useFeedback() {
     })
   }
 
-  // Submit feedback (customer)
+  // Get active public feedback form for the customer's organization
+  const useActiveForms = () => {
+    return useQuery({
+      queryKey: ['feedback', 'active-forms'],
+      queryFn: () => feedbackService.getActiveForms(),
+    })
+  }
+
+  // Submit feedback (customer) — formId + ticketId + real question answers
   const submitFeedbackMutation = useMutation({
-    mutationFn: (data: CreateFeedbackRequest) => feedbackService.submitFeedback(data),
+    mutationFn: (data: {
+      formId: string
+      ticketId: string
+      answers: { questionId: string; value: string | number | string[] | null }[]
+      publicComment?: string
+    }) => feedbackService.submitFeedbackForm(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: FEEDBACK_QUERY_KEYS.my })
       queryClient.invalidateQueries({ queryKey: FEEDBACK_QUERY_KEYS.analytics })
@@ -139,6 +152,7 @@ export function useFeedback() {
     isLoadingStats,
     refetchStats,
     useMyFeedback,
+    useActiveForms,
     submitFeedback: submitFeedbackMutation.mutate,
     isSubmitting: submitFeedbackMutation.isPending,
     replyToFeedback: replyToFeedbackMutation.mutate,

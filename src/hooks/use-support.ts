@@ -281,4 +281,7 @@ export function useSupport() {
     isSavingFilter: saveFilterMutation.isPending,
 
     // Export
-    exportTickets: exportTicketsMu
+    exportTickets: exportTicketsMutation.mutate,
+    isExporting: exportTicketsMutation.isPending,
+  }
+}

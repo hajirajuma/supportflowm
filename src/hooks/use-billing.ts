@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { billingService } from '@/services/billing.service'
 import { useBillingStore } from '@/store/billing-store'
-import { CheckoutSession, PaymentIntent } from '@/types/billing'
+import { CheckoutSession, PaymentIntent, BillingInterval } from '@/types/billing'
 
 export const BILLING_QUERY_KEYS = {
   plans: ['billing', 'plans'],
@@ -30,8 +30,10 @@ export function useBilling() {
     refetch: refetchPlans,
   } = useQuery({
     queryKey: BILLING_QUERY_KEYS.plans,
-    queryFn: () => billingService.getPlans(),
-    onSuccess: (data) => setPlans(data),
+    queryFn: () => billingService.getPlans().then((data) => {
+      setPlans(data)
+      return data
+    }),
   })
 
   // Get subscription
@@ -41,8 +43,10 @@ export function useBilling() {
     refetch: refetchSubscription,
   } = useQuery({
     queryKey: BILLING_QUERY_KEYS.subscription,
-    queryFn: () => billingService.getSubscription(),
-    onSuccess: (data) => setSubscription(data),
+    queryFn: () => billingService.getSubscription().then((data) => {
+      setSubscription(data)
+      return data
+    }),
   })
 
   // Get usage
@@ -52,8 +56,10 @@ export function useBilling() {
     refetch: refetchUsage,
   } = useQuery({
     queryKey: BILLING_QUERY_KEYS.usage,
-    queryFn: () => billingService.getUsage(),
-    onSuccess: (data) => setUsage(data),
+    queryFn: () => billingService.getUsage().then((data) => {
+      setUsage(data)
+      return data
+    }),
     refetchInterval: 30000,
   })
 

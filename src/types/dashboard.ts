@@ -19,6 +19,7 @@ export type ActivityType =
   | 'ticket_created'
   | 'ticket_resolved'
   | 'ticket_replied'
+  | 'ticket_updated'
   | 'feedback_received'
   | 'user_joined'
   | 'member_joined'
@@ -144,6 +145,9 @@ export interface PlatformAnalytics {
 export interface AgentPerformance {
   resolvedTickets: number
   openTickets: number
+  productivity?: number
+  ticketsResolved: number
+  ticketsAssigned: number
   averageResponseTime: number
   averageResolutionTime: number
   satisfactionScore: number

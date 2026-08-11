@@ -6,11 +6,53 @@ import { useAuthStore } from '@/store/auth-store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authService } from '@/services/auth.service'
 import { toast } from 'sonner'
-import { LoginCredentials, AcceptInvitationRequest } from '@/types/auth'
+import { LoginCredentials, AcceptInvitationRequest, User } from '@/types/auth'
 
 export const AUTH_QUERY_KEYS = {
   profile: ['auth', 'profile'],
   invitation: (token: string) => ['auth', 'invitation', token],
+}
+
+interface LoginMutationArgs {
+  credentials: LoginCredentials
+  redirect?: string | null
+}
+
+export const ROLE_HOME: Record<string, string> = {
+  platform_admin: '/admin/dashboard',
+  tenant_owner: '/tenant/dashboard',
+  support_agent: '/support/dashboard',
+  customer: '/customer/dashboard',
+}
+
+/**
+ * Role-scoped home dashboard for a user, defaulting to the tenant dashboard.
+ * Used after login/verification so the user lands on their own workspace
+ * instead of being bounced back to the login page.
+ */
+export function roleHomeFor(roles: string[] | undefined | null): string {
+  const role = (roles && roles[0]) || 'guest'
+  return ROLE_HOME[role] || '/tenant/dashboard'
+}
+
+/**
+ * Allow only internal redirect paths (starts with a single "/") to avoid
+ * open-redirects while still honoring middleware-supplied `?redirect=`.
+ */
+export function isSafeRedirect(path: string | null | undefined): string | null {
+  if (!path) return null
+  if (!path.startsWith('/')) return null
+  if (path.startsWith('//') || path.startsWith('/\\')) return null
+  return path
+}
+
+function resolvePostLoginDestination(
+  redirect: string | null | undefined,
+  roles: string[]
+): string {
+  const safeRedirect = isSafeRedirect(redirect)
+  if (safeRedirect) return safeRedirect
+  return roleHomeFor(roles)
 }
 
 export function useAuth() {
@@ -40,29 +82,19 @@ export function useAuth() {
 
   // Login mutation
   const loginMutation = useMutation({
-    mutationFn: (credentials: LoginCredentials) => authService.login(credentials),
-    onSuccess: (response) => {
+    mutationFn: (args: LoginMutationArgs) => authService.login(args.credentials),
+    onSuccess: (response, args) => {
       setAuth(response.user, response.accessToken, response.refreshToken)
       toast.success('Welcome back!')
-      
-      // Redirect based on role
-      const role = response.user.roles[0]
-      switch (role) {
-        case 'platform_admin':
-          router.push('/platform-admin/dashboard')
-          break
-        case 'tenant_owner':
-          router.push('/tenant/dashboard')
-          break
-        case 'support_agent':
-          router.push('/platform/tickets')
-          break
-        case 'customer':
-          router.push('/customer/tickets')
-          break
-        default:
-          router.push('/dashboard')
-      }
+
+      // Prefer the requested (sanitized) redirect, otherwise land on the
+      // role's home dashboard. Tenant owners end up on /tenant/dashboard even
+      // when signing in straight from /verify-email.
+      const destination = resolvePostLoginDestination(
+        args.redirect,
+        response.user.roles
+      )
+      router.push(destination)
     },
     onError: (error: any) => {
       toast.error(error.message || 'Login failed. Please try again.')
@@ -112,9 +144,20 @@ export function useAuth() {
   // Verify email mutation
   const verifyEmailMutation = useMutation({
     mutationFn: (token: string) => authService.verifyEmail({ token }),
-    onSuccess: (data) => {
-      toast.success(data.message || 'Email verified successfully')
-      refetchProfile()
+    onSuccess: (response) => {
+      toast.success('Email verified successfully')
+
+      if (response.accessToken && response.user?.id) {
+        // Auto-login: the backend issued tokens during verification. The
+        // verify-email page owns the redirect to the tenant dashboard (with a
+        // visible countdown) so the user is never sent back to the login page.
+        setAuth(response.user, response.accessToken, response.refreshToken)
+        refetchProfile()
+      } else {
+        // Idempotent re-verification of an already-verified account: no new
+        // session is issued, just refresh the cached profile.
+        refetchProfile()
+      }
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to verify email')
@@ -132,17 +175,12 @@ export function useAuth() {
     },
   })
 
-  // Accept invitation mutation
+  // Accept invitation mutation. The accept-invitation page owns the success
+  // state ("Invitation Accepted") and redirects the user to the exact
+  // organization's subdomain login page — we deliberately do NOT create a
+  // session or navigate here, so the user signs in through that tenant.
   const acceptInvitationMutation = useMutation({
     mutationFn: (data: AcceptInvitationRequest) => authService.acceptInvitation(data),
-    onSuccess: (response) => {
-      setAuth(response.user, response.accessToken, response.refreshToken)
-      toast.success('Invitation accepted! Welcome to SupportFlow')
-      router.push('/dashboard')
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to accept invitation')
-    },
   })
 
   // Get invitation details
@@ -183,7 +221,8 @@ export function useAuth() {
     accessToken,
 
     // Mutations
-    login: loginMutation.mutate,
+    login: (credentials: LoginCredentials, redirect?: string | null) =>
+      loginMutation.mutate({ credentials, redirect }),
     isLoggingIn: loginMutation.isPending,
     loginError: loginMutation.error,
 
@@ -196,13 +235,14 @@ export function useAuth() {
     resetPassword: resetPasswordMutation.mutate,
     isResetPasswordLoading: resetPasswordMutation.isPending,
 
-    verifyEmail: verifyEmailMutation.mutate,
+    verifyEmail: (token: string) => verifyEmailMutation.mutateAsync(token),
     isVerifyingEmail: verifyEmailMutation.isPending,
 
-    resendVerification: resendVerificationMutation.mutate,
+    resendVerification: (email: string) =>
+      resendVerificationMutation.mutateAsync(email),
     isResendingVerification: resendVerificationMutation.isPending,
 
-    acceptInvitation: acceptInvitationMutation.mutate,
+    acceptInvitation: acceptInvitationMutation.mutateAsync,
     isAcceptingInvitation: acceptInvitationMutation.isPending,
 
     rejectInvitation: rejectInvitationMutation.mutate,

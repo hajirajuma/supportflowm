@@ -199,6 +199,8 @@ export interface SystemSettings {
 }
 
 export interface AdminFilters {
+  page?: number
+  limit?: number
   search?: string
   status?: string
   plan?: string

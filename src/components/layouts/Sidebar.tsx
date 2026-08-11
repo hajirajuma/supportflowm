@@ -31,11 +31,11 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
   const navItems: NavItem[] = [
     {
       label: 'Dashboard',
-      href: isPlatformAdmin ? '/admin/dashboard' : '/platform/dashboard',
+      href: isPlatformAdmin ? '/admin/dashboard' : '/support/dashboard',
       icon: LayoutDashboard,
     },
     ...(isSupportAgent
-      ? [{ label: 'Tickets', href: '/platform/tickets', icon: Ticket }]
+      ? [{ label: 'Tickets', href: '/support/tickets', icon: Ticket }]
       : []),
     ...(isPlatformAdmin
       ? [{ label: 'Billing', href: '/admin/billing', icon: CreditCard }]

@@ -20,9 +20,11 @@ interface ActivityFeedProps {
 
 export function ActivityFeed({ activities, className, limit = 10 }: ActivityFeedProps) {
   const getIcon = (type: ActivityItem['type']) => {
-    const icons = {
+    const icons: Partial<Record<ActivityItem['type'], any>> = {
       ticket_created: Ticket,
       ticket_resolved: CheckCircle,
+      ticket_replied: Ticket,
+      ticket_updated: Ticket,
       feedback_received: Star,
       user_joined: UserPlus,
       payment_received: CreditCard,
@@ -31,9 +33,11 @@ export function ActivityFeed({ activities, className, limit = 10 }: ActivityFeed
   }
 
   const getColor = (type: ActivityItem['type']) => {
-    const colors = {
+    const colors: Partial<Record<ActivityItem['type'], string>> = {
       ticket_created: 'text-primary',
       ticket_resolved: 'text-success',
+      ticket_replied: 'text-primary',
+      ticket_updated: 'text-primary',
       feedback_received: 'text-warning',
       user_joined: 'text-secondary',
       payment_received: 'text-success',

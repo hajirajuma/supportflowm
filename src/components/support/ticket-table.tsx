@@ -110,16 +110,15 @@ export function TicketTable({
           aria-label="Select all"
         />
       ),
-      cell: ({ row }) => (
+      cell: ({ row, table }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => {
             row.toggleSelected(!!value)
             if (onSelectionChange) {
-              const selectedIds = row
-                .getParentRow()
-                ?.getSelectedRowModel()
-                .rows.map((r) => r.original.id) || []
+              const selectedIds = table
+                .getSelectedRowModel()
+                .rows.map((r) => r.original.id)
               onSelectionChange(selectedIds)
             }
           }}

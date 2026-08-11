@@ -26,27 +26,28 @@ interface SatisfactionChartProps {
   className?: string
 }
 
-export function SatisfactionChart({ data, type = 'trend', className }: SatisfactionChartProps) {
-  const formatDate = (date: string) => {
-    const d = new Date(date)
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
+function formatDate(date: string) {
+  const d = new Date(date)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="rounded-lg border bg-background p-3 shadow-md">
-          <p className="font-medium">{formatDate(label)}</p>
-          {payload.map((item: any, index: number) => (
-            <p key={index} className="text-sm text-muted-foreground">
-              {item.name}: {typeof item.value === 'number' ? item.value.toFixed(1) : item.value}
-            </p>
-          ))}
-        </div>
-      )
-    }
-    return null
+function CustomTooltip({ active, payload, label }: any) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-lg border bg-background p-3 shadow-md">
+        <p className="font-medium">{formatDate(label)}</p>
+        {payload.map((item: any, index: number) => (
+          <p key={index} className="text-sm text-muted-foreground">
+            {item.name}: {typeof item.value === 'number' ? item.value.toFixed(1) : item.value}
+          </p>
+        ))}
+      </div>
+    )
   }
+  return null
+}
+
+export function SatisfactionChart({ data, type = 'trend', className }: SatisfactionChartProps) {
 
   if (type === 'trend') {
     return (

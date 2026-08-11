@@ -13,7 +13,7 @@ export const MESSAGE_QUERY_KEYS = {
 // data and no-op mutations so the UI remains functional.
 export function useMessages() {
   const useConversations = (params?: any) => {
-    return useQuery({
+    return useQuery<{ data: Conversation[]; total: number }>({
       queryKey: [...MESSAGE_QUERY_KEYS.conversations, params],
       queryFn: async () => ({ data: [] as Conversation[], total: 0 }),
       enabled: false,
@@ -21,7 +21,7 @@ export function useMessages() {
   }
 
   const useMessages = (conversationId: string, params?: any) => {
-    return useQuery({
+    return useQuery<{ data: Message[] }>({
       queryKey: [...MESSAGE_QUERY_KEYS.messages(conversationId), params],
       queryFn: async () => ({ data: [] as Message[] }),
       enabled: false,

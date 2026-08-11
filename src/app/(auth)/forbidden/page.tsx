@@ -16,7 +16,7 @@ export default function ForbiddenPage() {
         </div>
         <CardTitle className="text-2xl text-center">Access Denied</CardTitle>
         <CardDescription className="text-center">
-          You don't have permission to access this page
+          You don&apos;t have permission to access this page
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

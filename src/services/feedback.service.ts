@@ -4,12 +4,71 @@ import {
   FeedbackResponse,
   FeedbackAnalytics,
   FeedbackFilters,
+  FeedbackRating,
   CreateFeedbackRequest,
   UpdateFeedbackRequest,
   FeedbackStats,
+  FeedbackForm,
+  FeedbackAnswerValue,
 } from '@/types/feedback'
 
 const FEEDBACK_BASE = '/feedback'
+
+/**
+ * Maps the backend's feedback-analytics payload onto the FeedbackAnalytics
+ * shape the feedback dashboard page consumes. The backend returns
+ * ratingDistribution as an object ({ 1: 2, 2: 3, ... }) while the page expects
+ * an array of { rating, count, percentage } — this conversion fixes the
+ * "data.sort is not a function" crash.
+ */
+function mapFeedbackAnalytics(raw: any): FeedbackAnalytics {
+  const summary = raw?.summary ?? {}
+  const distribution: Record<string, number> = raw?.ratingDistribution ?? {}
+
+  const entries = [1, 2, 3, 4, 5].map((rating) => ({
+    rating: rating as FeedbackRating,
+    count: distribution[rating] ?? 0,
+  }))
+  const total =
+    summary.totalResponses ?? entries.reduce((sum, e) => sum + e.count, 0)
+  const positiveCount = (distribution[4] ?? 0) + (distribution[5] ?? 0)
+  const neutralCount = distribution[3] ?? 0
+  const negativeCount = (distribution[1] ?? 0) + (distribution[2] ?? 0)
+  const percentage = (count: number) =>
+    total > 0 ? Math.round((count / total) * 1000) / 10 : 0
+
+  const trends = raw?.trends ?? []
+
+  return {
+    total,
+    averageRating: summary.averageRating ?? 0,
+    satisfactionPercentage: summary.cSat ?? summary.csat ?? 0,
+    positiveCount,
+    negativeCount,
+    neutralCount,
+    ratingDistribution: entries.map((e) => ({
+      rating: e.rating,
+      count: e.count,
+      percentage: percentage(e.count),
+    })),
+    sentimentBreakdown: {
+      positive: positiveCount,
+      neutral: neutralCount,
+      negative: negativeCount,
+    },
+    categoryBreakdown: [],
+    trendData: trends.map((t: any) => ({
+      date: t.period,
+      count: t.count ?? 0,
+      averageRating: t.average ?? 0,
+    })),
+    volumeData: trends.map((t: any) => ({
+      date: t.period,
+      count: t.count ?? 0,
+    })),
+    recentFeedback: [],
+  }
+}
 
 function buildFeedbackQuery(params?: {
   page?: number
@@ -62,7 +121,8 @@ export const feedbackService = {
 
   // Get feedback analytics
   async getAnalytics(): Promise<FeedbackAnalytics> {
-    return apiClient.get(`${FEEDBACK_BASE}/analytics`)
+    const raw = await apiClient.get<any>(`${FEEDBACK_BASE}/analytics`)
+    return mapFeedbackAnalytics(raw)
   },
 
   // Get feedback stats
@@ -70,19 +130,30 @@ export const feedbackService = {
     return apiClient.get(`${FEEDBACK_BASE}/dashboard`)
   },
 
-  // Submit feedback (customer)
-  async submitFeedback(data: CreateFeedbackRequest): Promise<Feedback> {
+  // Get active public feedback form for the current organization
+  async getActiveForms(): Promise<{ items: FeedbackForm[]; total: number }> {
+    return apiClient.get(`${FEEDBACK_BASE}/forms`, { params: { limit: 20 } })
+  },
+
+  // Get a single feedback form with its questions
+  async getForm(id: string): Promise<FeedbackForm> {
+    return apiClient.get(`${FEEDBACK_BASE}/forms/${id}`)
+  },
+
+  // Submit feedback (customer) — answers keyed to the form's real question
+  // ids, plus formId + ticketId as required by the backend submit contract.
+  async submitFeedbackForm(data: {
+    formId: string
+    ticketId: string
+    answers: FeedbackAnswerValue[]
+    publicComment?: string
+  }): Promise<Feedback> {
     const formData = new FormData()
-    formData.append(
-      'answers',
-      JSON.stringify([
-        { questionId: 'rating', value: data.rating },
-        { questionId: 'category', value: data.category },
-      ])
-    )
-    formData.append('publicComment', data.message)
-    if (data.ticketId) {
-      formData.append('ticketId', data.ticketId)
+    formData.append('formId', data.formId)
+    formData.append('ticketId', data.ticketId)
+    formData.append('answers', JSON.stringify(data.answers))
+    if (data.publicComment) {
+      formData.append('publicComment', data.publicComment)
     }
     return apiClient.post(`${FEEDBACK_BASE}/submit`, formData)
   },

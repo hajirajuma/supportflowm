@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { dashboardService } from '@/services/dashboard.service'
 import { socketManager } from '@/lib/socket'
+import { useAuthStore } from '@/store/auth-store'
 import { DashboardFilters, DashboardStats } from '@/types/dashboard'
 
 export const DASHBOARD_QUERY_KEYS = {
@@ -20,6 +21,8 @@ export const DASHBOARD_QUERY_KEYS = {
 
 export function useDashboard() {
   const queryClient = useQueryClient()
+  const roles = useAuthStore((s) => s.roles)
+  const isPlatformAdmin = (roles as string[]).includes('platform_admin')
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: 'month',
     metrics: ['tickets', 'satisfaction', 'performance'],
@@ -57,7 +60,7 @@ export function useDashboard() {
     queryKey: DASHBOARD_QUERY_KEYS.platform,
     queryFn: () => dashboardService.getPlatformDashboard(),
     refetchInterval: 30000,
-    enabled: false, // Only enable for platform admins
+    enabled: isPlatformAdmin, // Only enable for platform admins
   })
 
   // Agent Dashboard

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -15,6 +15,14 @@ import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordPageContent />
+    </Suspense>
+  )
+}
+
+function ResetPasswordPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -94,7 +102,7 @@ export default function ResetPasswordPage() {
         <CardHeader>
           <CardTitle className="text-2xl text-center">Password reset successful!</CardTitle>
           <CardDescription className="text-center">
-            Your password has been reset. You'll be redirected to login.
+            Your password has been reset. You&apos;ll be redirected to login.
           </CardDescription>
         </CardHeader>
         <CardContent>

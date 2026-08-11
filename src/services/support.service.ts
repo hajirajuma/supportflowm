@@ -1,4 +1,5 @@
 import { apiClient } from './api-client'
+import { User } from '@/types/auth'
 import {
   SupportTicket,
   SupportStats,
@@ -14,9 +15,192 @@ import {
   TicketReply,
   InternalNote,
   TimelineEvent,
+  TicketStatus,
+  TicketPriority,
+  TicketCategory,
+  TicketAttachment,
+  SLAInfo,
 } from '@/types/support'
 
 const SUPPORT_BASE = '/tickets'
+
+/**
+ * The backend exposes tickets with raw Prisma fields (subject, UPPERCASE
+ * status/priority, createdBy, category object, ticketTags, originalName/
+ * publicUrl attachments). The frontend components expect the SupportTicket
+ * shape (title, lowercase status/priority, customer, string category, tags,
+ * fileName/fileUrl). These helpers bridge the two so the ticket pages don't
+ * crash on `ticket.customer.firstName` or render empty cells.
+ */
+function toUser(raw: any): User {
+  return {
+    id: raw?.id ?? '',
+    email: raw?.email ?? '',
+    firstName: raw?.firstName ?? '',
+    lastName: raw?.lastName ?? '',
+    fullName: `${raw?.firstName ?? ''} ${raw?.lastName ?? ''}`.trim(),
+    avatar: raw?.avatar ?? raw?.avatarUrl,
+    roles: [],
+    permissions: [],
+    emailVerified: false,
+    isActive: true,
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+    updatedAt: raw?.updatedAt ?? new Date().toISOString(),
+  }
+}
+
+function normalizeStatus(status?: string): TicketStatus {
+  switch ((status ?? '').toUpperCase()) {
+    case 'NEW':
+      return 'new'
+    case 'OPEN':
+      return 'open'
+    case 'IN_PROGRESS':
+      return 'in_progress'
+    case 'WAITING_FOR_CUSTOMER':
+    case 'ON_HOLD':
+    case 'PENDING_CUSTOMER':
+      return 'pending_customer'
+    case 'RESOLVED':
+      return 'resolved'
+    case 'CLOSED':
+      return 'closed'
+    default:
+      return 'open'
+  }
+}
+
+function normalizePriority(priority?: string): TicketPriority {
+  const value = (priority ?? '').toLowerCase()
+  return ['low', 'medium', 'high', 'critical', 'urgent'].includes(value)
+    ? (value as TicketPriority)
+    : 'medium'
+}
+
+function toAttachment(raw: any, ticketId: string): TicketAttachment {
+  return {
+    id: raw?.id,
+    fileName: raw?.fileName ?? raw?.originalName ?? '',
+    fileSize: raw?.fileSize ?? 0,
+    fileType: raw?.fileType ?? raw?.mimeType ?? '',
+    fileUrl: raw?.fileUrl ?? raw?.publicUrl ?? '',
+    uploadedBy: toUser(raw?.uploadedBy),
+    ticketId: raw?.ticketId ?? ticketId,
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+  }
+}
+
+function toReply(raw: any): TicketReply {
+  return {
+    id: raw?.id,
+    content: raw?.content ?? raw?.body ?? '',
+    isInternal: raw?.isInternal ?? false,
+    author: toUser(raw?.author ?? raw?.createdBy),
+    attachments: (raw?.attachments ?? []).map((a: any) =>
+      toAttachment(a, raw?.ticketId ?? '')
+    ),
+    isDraft: raw?.isDraft ?? false,
+    ticketId: raw?.ticketId ?? '',
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+    updatedAt: raw?.updatedAt ?? raw?.createdAt ?? new Date().toISOString(),
+  }
+}
+
+function toNote(raw: any): InternalNote {
+  return {
+    id: raw?.id,
+    content: raw?.content ?? raw?.body ?? '',
+    author: toUser(raw?.author ?? raw?.createdBy),
+    ticketId: raw?.ticketId ?? '',
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+    updatedAt: raw?.updatedAt ?? raw?.createdAt ?? new Date().toISOString(),
+  }
+}
+
+function mapActivityType(type?: string): TimelineEvent['type'] {
+  switch ((type ?? '').toUpperCase()) {
+    case 'CREATED':
+      return 'created'
+    case 'ASSIGNED':
+      return 'assigned'
+    case 'STATUS_CHANGED':
+      return 'status_changed'
+    case 'PRIORITY_CHANGED':
+      return 'priority_changed'
+    case 'CATEGORY_CHANGED':
+      return 'category_changed'
+    case 'REPLY_ADDED':
+    case 'CUSTOMER_REPLY':
+      return 'replied'
+    case 'NOTE_ADDED':
+      return 'note_added'
+    case 'ATTACHMENT_ADDED':
+      return 'attachment_added'
+    case 'RESOLVED':
+      return 'resolved'
+    case 'CLOSED':
+      return 'closed'
+    case 'REOPENED':
+      return 'reopened'
+    case 'MERGED':
+      return 'merged'
+    default:
+      return 'status_changed'
+  }
+}
+
+function toTimelineEvent(raw: any): TimelineEvent {
+  return {
+    id: raw?.id,
+    type: mapActivityType(raw?.activityType ?? raw?.type),
+    description: raw?.description ?? raw?.title ?? 'Activity',
+    user: toUser(raw?.actor ?? raw?.user),
+    metadata: raw?.metadata,
+    createdAt: raw?.createdAt ?? new Date().toISOString(),
+  }
+}
+
+function mapTicket(raw: any): SupportTicket {
+  const categoryRaw = raw?.category
+  const category = (
+    typeof categoryRaw === 'string' ? categoryRaw : categoryRaw?.name ?? 'general'
+  ) as TicketCategory
+
+  const tags = Array.isArray(raw?.tags)
+    ? raw.tags
+    : (raw?.ticketTags ?? [])
+        .map((t: any) => t?.tag?.name ?? t?.name ?? '')
+        .filter(Boolean)
+
+  return {
+    id: raw.id,
+    ticketNumber: raw.ticketNumber,
+    title: raw.title ?? raw.subject ?? '',
+    description: raw.description ?? '',
+    status: normalizeStatus(raw?.status),
+    priority: normalizePriority(raw?.priority),
+    category,
+    customerId: (raw?.customer ?? raw?.createdBy)?.id ?? '',
+    customer: toUser(raw?.customer ?? raw?.createdBy),
+    assignedToId: raw?.assignedToId,
+    assignedTo: raw?.assignedTo ? toUser(raw.assignedTo) : undefined,
+    departmentId: raw?.departmentId,
+    department: raw?.department,
+    organizationId: raw?.organizationId,
+    attachments: (raw?.attachments ?? []).map((a: any) => toAttachment(a, raw.id)),
+    replies: raw?.replies ?? [],
+    notes: raw?.notes ?? [],
+    timeline: raw?.timeline ?? [],
+    tags,
+    dueDate: raw?.dueAt,
+    sla: raw?.sla ?? ({} as SLAInfo),
+    firstResponseAt: raw?.firstRespondedAt,
+    resolvedAt: raw?.resolvedAt,
+    closedAt: raw?.closedAt,
+    createdAt: raw?.createdAt,
+    updatedAt: raw?.updatedAt ?? raw?.lastActivityAt ?? raw?.createdAt,
+  }
+}
 
 function buildTicketParams(params?: {
   page?: number
@@ -84,11 +268,20 @@ export const supportService = {
     sort?: string
     order?: 'asc' | 'desc'
   }): Promise<{ data: SupportTicket[]; total: number; page: number; limit: number }> {
-    return apiClient.get(SUPPORT_BASE, { params: buildTicketParams(params) })
+    const res = await apiClient.get<any>(SUPPORT_BASE, {
+      params: buildTicketParams(params),
+    })
+    return {
+      data: (res?.data ?? []).map(mapTicket),
+      total: res?.total ?? 0,
+      page: res?.page ?? 1,
+      limit: res?.limit ?? 0,
+    }
   },
 
   async getTicket(id: string): Promise<SupportTicket> {
-    return apiClient.get<SupportTicket>(`${SUPPORT_BASE}/${id}`)
+    const res = await apiClient.get<any>(`${SUPPORT_BASE}/${id}`)
+    return mapTicket(res)
   },
 
   async createTicket(data: CreateSupportTicketRequest): Promise<SupportTicket> {
@@ -154,7 +347,8 @@ export const supportService = {
 
   // Replies
   async getReplies(ticketId: string): Promise<TicketReply[]> {
-    return apiClient.get<TicketReply[]>(`${SUPPORT_BASE}/${ticketId}/replies`)
+    const res = await apiClient.get<any>(`${SUPPORT_BASE}/${ticketId}/replies`)
+    return (Array.isArray(res) ? res : res?.data ?? []).map(toReply)
   },
 
   async createReply(ticketId: string, data: CreateReplyRequest): Promise<TicketReply> {
@@ -180,7 +374,8 @@ export const supportService = {
 
   // Internal Notes
   async getNotes(ticketId: string): Promise<InternalNote[]> {
-    return apiClient.get<InternalNote[]>(`${SUPPORT_BASE}/${ticketId}/notes`)
+    const res = await apiClient.get<any>(`${SUPPORT_BASE}/${ticketId}/notes`)
+    return (Array.isArray(res) ? res : res?.data ?? []).map(toNote)
   },
 
   async createNote(ticketId: string, data: CreateNoteRequest): Promise<InternalNote> {
@@ -201,7 +396,8 @@ export const supportService = {
 
   // Timeline
   async getTimeline(ticketId: string): Promise<TimelineEvent[]> {
-    return apiClient.get<TimelineEvent[]>(`${SUPPORT_BASE}/${ticketId}/timeline`)
+    const res = await apiClient.get<any>(`${SUPPORT_BASE}/${ticketId}/timeline`)
+    return (Array.isArray(res) ? res : res?.data ?? []).map(toTimelineEvent)
   },
 
   // Watchers

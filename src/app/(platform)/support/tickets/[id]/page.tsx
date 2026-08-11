@@ -221,7 +221,7 @@ export default function TicketDetailPage() {
                       'bg-blue-500/10 text-blue-500': ticket.status === 'new',
                       'bg-primary/10 text-primary': ticket.status === 'open',
                       'bg-warning/10 text-warning': ticket.status === 'in_progress',
-                      'bg-warning/10 text-warning': ticket.status === 'pending_customer',
+                      'bg-amber-500/10 text-amber-500': ticket.status === 'pending_customer',
                       'bg-success/10 text-success': ticket.status === 'resolved',
                       'bg-muted text-muted-foreground': ticket.status === 'closed',
                     })}

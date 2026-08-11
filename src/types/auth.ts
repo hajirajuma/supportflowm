@@ -71,18 +71,18 @@ export interface InvitationData {
   lastName?: string
   role: UserRole
   organizationName: string
-  expiresAt: string
-  invitedBy: {
+  subdomain?: string
+  expiresAt?: string
+  invitedBy?: {
     firstName: string
     lastName: string
     email: string
-  }
+  } | null
 }
 
 export interface AcceptInvitationRequest {
   token: string
   password: string
-  confirmPassword: string
   firstName: string
   lastName: string
 }
@@ -91,4 +91,34 @@ export interface RefreshTokenResponse {
   accessToken: string
   refreshToken?: string
   expiresIn: number
+}
+
+// Add to existing auth.ts
+export interface RegisterRequest {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  organizationName: string
+  subdomain: string
+  
+}
+
+export interface RegisterResponse {
+  user: User
+  organization: {
+    id: string
+    name: string
+    subdomain: string
+  }
+  accessToken?: string
+  refreshToken?: string
+  requiresEmailVerification: boolean
+  message: string
+}
+
+export interface SubdomainAvailabilityResponse {
+  available: boolean
+  message?: string
+  suggestion?: string
 }

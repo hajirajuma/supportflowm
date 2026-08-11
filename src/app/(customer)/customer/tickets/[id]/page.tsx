@@ -23,6 +23,12 @@ import { FileUpload } from '@/components/ui/file-upload'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import {
+  ticketStatusLabel,
+  ticketPriorityLabel,
+  ticketStatusBadge,
+  ticketPriorityBadge,
+} from '@/lib/ticket-labels'
+import {
   ArrowLeft,
   Paperclip,
   MessageSquare,
@@ -115,13 +121,15 @@ export default function TicketDetailPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'open':
+      case 'OPEN':
+      case 'IN_PROGRESS':
+      case 'WAITING_FOR_CUSTOMER':
+      case 'ON_HOLD':
+      case 'REOPENED':
         return <Clock className="h-4 w-4" />
-      case 'pending':
-        return <Clock className="h-4 w-4" />
-      case 'resolved':
+      case 'RESOLVED':
         return <CheckCircle className="h-4 w-4" />
-      case 'closed':
+      case 'CLOSED':
         return <XCircle className="h-4 w-4" />
       default:
         return null
@@ -139,7 +147,7 @@ export default function TicketDetailPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">Ticket #{ticket.ticketNumber}</h1>
-          <p className="text-muted-foreground">{ticket.title}</p>
+          <p className="text-muted-foreground">{ticket.subject}</p>
         </div>
       </div>
 
@@ -154,21 +162,24 @@ export default function TicketDetailPage() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className={cn('capitalize', {
-                'bg-blue-500/10 text-blue-500': ticket.status === 'open',
-                'bg-warning/10 text-warning': ticket.status === 'pending',
-                'bg-success/10 text-success': ticket.status === 'resolved',
-                'bg-muted text-muted-foreground': ticket.status === 'closed',
-              })}>
+              <Badge
+                variant="outline"
+                className={cn(ticketStatusBadge(ticket.status))}
+              >
                 {getStatusIcon(ticket.status)}
-                <span className="ml-1">{ticket.status}</span>
+                <span className="ml-1">{ticketStatusLabel(ticket.status)}</span>
               </Badge>
-              <Badge variant="outline" className="capitalize">
-                {ticket.priority}
+              <Badge
+                variant="outline"
+                className={cn(ticketPriorityBadge(ticket.priority))}
+              >
+                {ticketPriorityLabel(ticket.priority)}
               </Badge>
-              <Badge variant="outline" className="capitalize">
-                {ticket.category.replace('_', ' ')}
-              </Badge>
+              {ticket.category?.name && (
+                <Badge variant="outline" className="capitalize">
+                  {ticket.category.name}
+                </Badge>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -186,13 +197,13 @@ export default function TicketDetailPage() {
                   {ticket.attachments.map((attachment) => (
                     <a
                       key={attachment.id}
-                      href={attachment.fileUrl}
+                      href={attachment.publicUrl ?? '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 rounded-md border p-2 hover:bg-accent"
                     >
                       <Paperclip className="h-4 w-4" />
-                      <span className="text-sm">{attachment.fileName}</span>
+                      <span className="text-sm">{attachment.originalName}</span>
                     </a>
                   ))}
                 </div>
@@ -216,7 +227,7 @@ export default function TicketDetailPage() {
         <CardHeader>
           <CardTitle>Conversation</CardTitle>
           <CardDescription>
-            {ticket.replies.length} replies
+            {replies?.total ?? 0} replies
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -228,13 +239,13 @@ export default function TicketDetailPage() {
                 ))}
               </div>
             ) : (
-              replies?.map((reply) => (
+              replies?.data?.map((reply) => (
                 <div key={reply.id} className="flex gap-4 border-b pb-4 last:border-0">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={reply.author.avatar} />
+                    <AvatarImage src={reply.author.avatarUrl ?? undefined} />
                     <AvatarFallback>
-                      {reply.author.firstName[0]}
-                      {reply.author.lastName[0]}
+                      {reply.author.firstName?.[0]}
+                      {reply.author.lastName?.[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
@@ -251,19 +262,19 @@ export default function TicketDetailPage() {
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap">{reply.content}</p>
+                    <p className="mt-1 whitespace-pre-wrap">{reply.body}</p>
                     {reply.attachments.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {reply.attachments.map((attachment) => (
                           <a
                             key={attachment.id}
-                            href={attachment.fileUrl}
+                            href={attachment.publicUrl ?? '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 rounded-md border p-1 px-2 text-sm hover:bg-accent"
                           >
                             <Paperclip className="h-3 w-3" />
-                            {attachment.fileName}
+                            {attachment.originalName}
                           </a>
                         ))}
                       </div>
@@ -277,7 +288,7 @@ export default function TicketDetailPage() {
       </Card>
 
       {/* Reply Form */}
-      {ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+      {ticket.status !== 'CLOSED' && ticket.status !== 'RESOLVED' && (
         <Card>
           <CardHeader>
             <CardTitle>Add Reply</CardTitle>

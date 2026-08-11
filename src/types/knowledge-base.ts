@@ -4,13 +4,15 @@ export interface Article {
   id: string
   slug: string
   title: string
+  description?: string
   content: string
+  readingTime?: number
   excerpt?: string
   categoryId: string
-  category?: ArticleCategory
+  category: ArticleCategory
   tags: ArticleTag[]
   authorId: string
-  author?: {
+  author: {
     id: string
     firstName: string
     lastName: string
@@ -63,6 +65,7 @@ export interface ArticleAnalytics {
   totalViews: number
   totalFeedback: number
   helpfulPercentage: number
+  averageRating: number
   topArticles: Array<{
     id: string
     title: string
@@ -70,6 +73,14 @@ export interface ArticleAnalytics {
     views: number
     helpfulCount: number
   }>
+  popularArticles: Array<{
+    id: string
+    title: string
+    slug: string
+    views: number
+    helpfulPercentage: number
+  }>
+  viewsOverTime: Array<{ date: string; views: number }>
   viewsByDay: Array<{ date: string; views: number }>
   categoryBreakdown: Array<{
     category: ArticleCategory

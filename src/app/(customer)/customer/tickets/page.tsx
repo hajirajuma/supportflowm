@@ -22,8 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Ticket, TicketStatus, TicketPriority, TicketCategory } from '@/types/customer'
+import { Ticket } from '@/types/customer'
 import { formatDate } from '@/lib/utils'
+import {
+  ticketStatusLabel,
+  ticketPriorityLabel,
+  ticketStatusBadge,
+  ticketPriorityBadge,
+} from '@/lib/ticket-labels'
 import { Search, Plus, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,7 +37,6 @@ export default function MyTicketsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
 
@@ -42,37 +47,19 @@ export default function MyTicketsPage() {
     search: search || undefined,
     status: statusFilter !== 'all' ? statusFilter : undefined,
     priority: priorityFilter !== 'all' ? priorityFilter : undefined,
-    category: categoryFilter !== 'all' ? categoryFilter : undefined,
   })
-
-  const getStatusColor = (status: TicketStatus) => {
-    const colors = {
-      open: 'bg-blue-500/10 text-blue-500',
-      pending: 'bg-warning/10 text-warning',
-      resolved: 'bg-success/10 text-success',
-      closed: 'bg-muted text-muted-foreground',
-    }
-    return colors[status]
-  }
-
-  const getPriorityColor = (priority: TicketPriority) => {
-    const colors = {
-      low: 'bg-success/10 text-success',
-      medium: 'bg-primary/10 text-primary',
-      high: 'bg-warning/10 text-warning',
-      critical: 'bg-destructive/10 text-destructive',
-    }
-    return colors[priority]
-  }
 
   const columns: ColumnDef<Ticket>[] = [
     {
       accessorKey: 'ticketNumber',
       header: 'Ticket',
       cell: ({ row }) => (
-        <div>
-          <p className="font-medium">#{row.original.ticketNumber}</p>
-          <p className="text-sm text-muted-foreground">{row.original.title}</p>
+        <div className="max-w-[280px]">
+          <p className="font-medium text-primary">#{row.original.ticketNumber}</p>
+          <p className="truncate text-sm font-medium">{row.original.subject}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground">
+            {row.original.description}
+          </p>
         </div>
       ),
     },
@@ -80,8 +67,8 @@ export default function MyTicketsPage() {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => (
-        <Badge variant="outline" className={cn('capitalize', getStatusColor(row.original.status))}>
-          {row.original.status}
+        <Badge variant="outline" className={cn(ticketStatusBadge(row.original.status))}>
+          {ticketStatusLabel(row.original.status)}
         </Badge>
       ),
     },
@@ -89,8 +76,8 @@ export default function MyTicketsPage() {
       accessorKey: 'priority',
       header: 'Priority',
       cell: ({ row }) => (
-        <Badge variant="outline" className={cn('capitalize', getPriorityColor(row.original.priority))}>
-          {row.original.priority}
+        <Badge variant="outline" className={cn(ticketPriorityBadge(row.original.priority))}>
+          {ticketPriorityLabel(row.original.priority)}
         </Badge>
       ),
     },
@@ -98,13 +85,31 @@ export default function MyTicketsPage() {
       accessorKey: 'category',
       header: 'Category',
       cell: ({ row }) => (
-        <span className="capitalize text-sm">{row.original.category.replace('_', ' ')}</span>
+        <span className="text-sm capitalize">
+          {row.original.category?.name ?? '—'}
+        </span>
       ),
+    },
+    {
+      accessorKey: 'assignedTo',
+      header: 'Assigned To',
+      cell: ({ row }) => {
+        const agent = row.original.assignedTo
+        return (
+          <span className="text-sm text-muted-foreground">
+            {agent ? `${agent.firstName} ${agent.lastName}` : 'Unassigned'}
+          </span>
+        )
+      },
     },
     {
       accessorKey: 'updatedAt',
       header: 'Last Updated',
-      cell: ({ row }) => formatDate(row.original.updatedAt),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {formatDate(row.original.updatedAt)}
+        </span>
+      ),
     },
     {
       id: 'actions',
@@ -150,45 +155,50 @@ export default function MyTicketsPage() {
                 <Input
                   placeholder="Search tickets..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setPage(1)
+                  }}
                   className="pl-9"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value)
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="OPEN">Open</SelectItem>
+                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                  <SelectItem value="WAITING_FOR_CUSTOMER">
+                    Waiting for Customer
+                  </SelectItem>
+                  <SelectItem value="RESOLVED">Resolved</SelectItem>
+                  <SelectItem value="CLOSED">Closed</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-[180px]">
+              <Select
+                value={priorityFilter}
+                onValueChange={(value) => {
+                  setPriorityFilter(value)
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
-                  <SelectItem value="billing">Billing</SelectItem>
-                  <SelectItem value="feature_request">Feature Request</SelectItem>
-                  <SelectItem value="bug_report">Bug Report</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="URGENT">Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

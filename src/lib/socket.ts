@@ -48,12 +48,16 @@ class SocketManager {
     }
 
     const options: Partial<ManagerOptions> & SocketOptions = {
-      auth: { token },
+      // Function form of auth: re-reads the token from the store on every
+      // connection attempt, so a token refresh or backend restart that drops
+      // sockets re-authenticates with the latest token.
+      auth: (cb: (data: object) => void) =>
+        cb({ token: useAuthStore.getState().accessToken }),
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 10000,
     }
 
     this.notificationSocket = io(`${SOCKET_URL}/notifications`, options)
@@ -69,9 +73,23 @@ class SocketManager {
       this.emitConnectionState(true)
     })
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       this.connectedSockets = Math.max(0, this.connectedSockets - 1)
       this.emitConnectionState(this.connectedSockets > 0)
+
+      // The server force-disconnects sockets whose JWT is missing/expired
+      // (gateway handleConnection calls client.disconnect(true)). Socket.IO
+      // does not auto-reconnect on a server-initiated disconnect, so reconnect
+      // manually after a short delay. The function-form `auth` re-reads the
+      // latest token from the store, so a token refreshed by the axios layer
+      // in the meantime is used on the next attempt.
+      if (reason === 'io server disconnect') {
+        setTimeout(() => {
+          if (useAuthStore.getState().accessToken) {
+            socket.connect()
+          }
+        }, 2000)
+      }
     })
 
     socket.on('connect_error', (error) => {
