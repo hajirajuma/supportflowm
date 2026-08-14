@@ -198,7 +198,6 @@ export function useBilling() {
     return useQuery({
       queryKey: BILLING_QUERY_KEYS.stats,
       queryFn: () => billingService.getBillingStats(),
-      enabled: false, // Only enable for admin users
     })
   }
 
@@ -207,7 +206,6 @@ export function useBilling() {
     return useQuery({
       queryKey: [...BILLING_QUERY_KEYS.adminSubscriptions, params],
       queryFn: () => billingService.getAdminSubscriptions(params),
-      enabled: false,
     })
   }
 

@@ -191,7 +191,9 @@ export default function AdminBillingDashboard() {
                     <Building2 className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">{subscription.organizationId}</p>
+                    <p className="font-medium">
+                      {subscription.organizationName ?? subscription.organizationId}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {subscription.plan.name}
                     </p>

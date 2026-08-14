@@ -11,8 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Plus, TrendingUp } from 'lucide-react'
 
 export default function PlansPage() {
-  const { plans, isLoadingPlans } = useAdmin()
+  const { plans, isLoadingPlans, deletePlan, isDeletingPlan } = useAdmin()
   const [editingPlan, setEditingPlan] = useState<any>(null)
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
 
@@ -50,9 +51,22 @@ export default function PlansPage() {
           <PlanCard
             key={plan.id}
             plan={plan}
+            isDeleting={deletingPlanId === plan.id && isDeletingPlan}
             onEdit={() => {
               setEditingPlan(plan)
               setIsEditOpen(true)
+            }}
+            onDelete={() => {
+              if (
+                window.confirm(
+                  `Deactivate the "${plan.name}" plan? It will no longer be offered to new customers.`
+                )
+              ) {
+                setDeletingPlanId(plan.id)
+                deletePlan(plan.id, {
+                  onSettled: () => setDeletingPlanId(null),
+                })
+              }
             }}
           />
         ))}

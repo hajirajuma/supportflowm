@@ -6,15 +6,17 @@ import { Button } from '@/components/ui/button'
 import { PlatformPlan } from '@/types/admin'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { CheckCircle, Pencil, Star } from 'lucide-react'
+import { CheckCircle, Pencil, Star, Trash2 } from 'lucide-react'
 
 interface PlanCardProps {
   plan: PlatformPlan
   onEdit?: (plan: PlatformPlan) => void
+  onDelete?: (plan: PlatformPlan) => void
+  isDeleting?: boolean
   className?: string
 }
 
-export function PlanCard({ plan, onEdit, className }: PlanCardProps) {
+export function PlanCard({ plan, onEdit, onDelete, isDeleting, className }: PlanCardProps) {
   return (
     <Card
       className={cn(
@@ -68,12 +70,30 @@ export function PlanCard({ plan, onEdit, className }: PlanCardProps) {
           ))}
         </ul>
 
-        {onEdit && (
-          <Button variant="outline" className="w-full" onClick={() => onEdit(plan)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Plan
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {onEdit && (
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => onEdit(plan)}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="text-destructive hover:text-destructive"
+              onClick={() => onDelete(plan)}
+              disabled={isDeleting}
+              aria-label={`Delete ${plan.name} plan`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

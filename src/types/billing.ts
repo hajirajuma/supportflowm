@@ -40,6 +40,7 @@ export interface Plan {
 export interface Subscription {
   id: string
   organizationId: string
+  organizationName?: string
   planId: string
   plan: Plan
   status: SubscriptionStatus
