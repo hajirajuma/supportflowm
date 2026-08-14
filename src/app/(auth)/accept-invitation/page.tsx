@@ -17,21 +17,6 @@ import { Progress } from '@/components/ui/progress'
 import { cn, formatDate } from '@/lib/utils'
 import { InvitationData } from '@/types/auth'
 
-/**
- * Builds the login URL for the invited organization's tenant subdomain, e.g.
- * https://acme.supportflow.com/login. The base domain comes from the current
- * window host so both dev (http://acme.localhost:3000) and production
- * (https://acme.supportflow.com) work; only the subdomain label is swapped,
- * so the user always lands on the exact organization's login page.
- */
-function getOrganizationLoginUrl(subdomain: string): string {
-  const { protocol, hostname, port } = window.location
-  const labels = hostname.toLowerCase().split('.')
-  const base = labels.length > 1 ? labels.slice(1).join('.') : labels[0]
-  const portSuffix = port ? `:${port}` : ''
-  return `${protocol}//${subdomain}.${base}${portSuffix}/login`
-}
-
 function AcceptInvitationPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -101,15 +86,15 @@ function AcceptInvitationPageContent() {
   }, [password])
 
   // Once accepted, show the success card briefly, then send the user to the
-  // login page of the exact organization they were invited to.
+  // shared application login page. The application uses one common URL for all
+  // organizations — tenant identification happens on the backend via the JWT.
   useEffect(() => {
-    const subdomain = invitation?.subdomain
-    if (!isAccepted || !subdomain) return
+    if (!isAccepted) return
     const timer = setTimeout(() => {
-      window.location.assign(getOrganizationLoginUrl(subdomain))
+      window.location.assign('/login')
     }, 2500)
     return () => clearTimeout(timer)
-  }, [isAccepted, invitation?.subdomain])
+  }, [isAccepted])
 
   const getPasswordStrengthColor = () => {
     if (passwordStrength < 30) return 'bg-destructive'
@@ -186,7 +171,7 @@ function AcceptInvitationPageContent() {
           <CardTitle className="text-2xl text-center text-success">Invitation Accepted!</CardTitle>
           <CardDescription className="text-center">
             Welcome to {invitation.organizationName}! Your account is ready —
-            you&apos;ll be redirected to your organization&apos;s sign-in page shortly.
+            you&apos;ll be redirected to the sign-in page shortly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -195,14 +180,12 @@ function AcceptInvitationPageContent() {
               <CheckCircle className="h-12 w-12 text-success" />
             </div>
           </div>
-          {!invitation.subdomain && (
-            <Button
-              className="mt-4 w-full"
-              onClick={() => window.location.assign('/login')}
-            >
-              Continue to sign in
-            </Button>
-          )}
+          <Button
+            className="mt-4 w-full"
+            onClick={() => window.location.assign('/login')}
+          >
+            Continue to sign in
+          </Button>
         </CardContent>
       </Card>
     )
@@ -237,10 +220,9 @@ function AcceptInvitationPageContent() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader>
-        <CardTitle className="text-2xl text-center">Accept Invitation</CardTitle>
-        <CardDescription className="text-center">
-          You&apos;ve been invited to join {invitation.organizationName}
-        </CardDescription>
+        <CardTitle className="text-2xl text-center">Accept Invitation</CardTitle>          <CardDescription className="text-center">
+            You&apos;ve been invited to join {invitation.organizationName}
+          </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Invitation Details */}

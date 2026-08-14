@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Building2, Mail, User, Phone, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Loader2, CheckCircle, Building2, Mail, User, Phone, AlertCircle } from 'lucide-react'
 import { registerSchema, RegisterFormValues } from '@/lib/validations/auth'
 import { authService } from '@/services/auth.service'
 import { Button } from '@/components/ui/button'
@@ -23,8 +23,6 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [passwordStrength, setPasswordStrength] = useState(0)
-  const [isSubdomainAvailable, setIsSubdomainAvailable] = useState<boolean | null>(null)
-  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false)
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [registrationData, setRegistrationData] = useState<any>(null)
 
@@ -32,10 +30,8 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
     setError,
-    clearErrors,
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -45,7 +41,6 @@ export default function RegisterPage() {
       password: '',
       confirmPassword: '',
       organizationName: '',
-      subdomain: '',
       phoneNumber: '',
       acceptTerms: false,
       acceptPrivacy: false,
@@ -53,24 +48,6 @@ export default function RegisterPage() {
   })
 
   const password = watch('password')
-  const subdomain = watch('subdomain')
-  const organizationName = watch('organizationName')
-
-  // Auto-generate subdomain from organization name
-  useEffect(() => {
-    if (organizationName && !subdomain) {
-      const generated = organizationName
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9-]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 30)
-      if (generated && !subdomain) {
-        setValue('subdomain', generated)
-      }
-    }
-  }, [organizationName, subdomain, setValue])
 
   // Password strength calculator
   useEffect(() => {
@@ -88,45 +65,6 @@ export default function RegisterPage() {
     setPasswordStrength(Math.min(strength, 100))
   }, [password])
 
-  // Check subdomain availability with debounce
-  useEffect(() => {
-    const checkSubdomain = async () => {
-      if (!subdomain || subdomain.length < 3) {
-        setIsSubdomainAvailable(null)
-        return
-      }
-
-      // Validate subdomain format
-      const isValid = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(subdomain)
-      if (!isValid) {
-        setIsSubdomainAvailable(null)
-        return
-      }
-
-      setIsCheckingSubdomain(true)
-      try {
-        const response = await authService.checkSubdomainAvailability(subdomain)
-        setIsSubdomainAvailable(response.available)
-        if (!response.available) {
-          setError('subdomain', {
-            type: 'manual',
-            message: response.message || 'This subdomain is already taken',
-          })
-        } else {
-          clearErrors('subdomain')
-        }
-      } catch (error) {
-        setIsSubdomainAvailable(null)
-        toast.error('Failed to check subdomain availability')
-      } finally {
-        setIsCheckingSubdomain(false)
-      }
-    }
-
-    const timer = setTimeout(checkSubdomain, 500)
-    return () => clearTimeout(timer)
-  }, [subdomain, setError, clearErrors])
-
   const getPasswordStrengthColor = () => {
     if (passwordStrength < 30) return 'bg-destructive'
     if (passwordStrength < 60) return 'bg-warning'
@@ -142,12 +80,6 @@ export default function RegisterPage() {
   }
 
   const onSubmit = async (data: RegisterFormValues) => {
-    // Don't submit if subdomain is not available
-    if (isSubdomainAvailable === false) {
-      toast.error('Please choose a different subdomain')
-      return
-    }
-
     setIsSubmitting(true)
 
     try {
@@ -160,9 +92,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
         organizationName: data.organizationName,
-        subdomain: data.subdomain,
-        
-}
+      }
 
       const response = await authService.register(registerData)
 
@@ -193,8 +123,6 @@ export default function RegisterPage() {
 
       if (errorMessage.includes('email')) {
         setError('email', { type: 'manual', message: errorMessage })
-      } else if (errorMessage.includes('subdomain')) {
-        setError('subdomain', { type: 'manual', message: errorMessage })
       } else if (errorMessage.includes('password')) {
         setError('password', { type: 'manual', message: errorMessage })
       } else {
@@ -279,7 +207,7 @@ export default function RegisterPage() {
               <div>
                 <p className="font-medium">Create Your Organization</p>
                 <p className="text-sm text-muted-foreground">
-                  Get your own workspace with a custom subdomain
+                  Get your own secure multi-tenant workspace
                 </p>
               </div>
             </div>
@@ -492,59 +420,6 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              {/* Subdomain */}
-              <div className="space-y-2">
-                <Label htmlFor="subdomain">Subdomain</Label>
-                <div className="relative">
-                  <Input
-                    id="subdomain"
-                    placeholder="acme"
-                    {...register('subdomain')}
-                    className={cn(
-                      'pr-20',
-                      errors.subdomain && 'border-destructive'
-                    )}
-                    disabled={isSubmitting}
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    .supportflow.com
-                  </span>
-                </div>
-
-                {/* Subdomain Availability Indicator */}
-                {subdomain && subdomain.length >= 3 && (
-                  <div className="flex items-center gap-2">
-                    {isCheckingSubdomain ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Checking availability...</span>
-                      </>
-                    ) : isSubdomainAvailable === true ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-success" />
-                        <span className="text-sm text-success">
-                          {subdomain}.supportflow.com is available
-                        </span>
-                      </>
-                    ) : isSubdomainAvailable === false ? (
-                      <>
-                        <XCircle className="h-4 w-4 text-destructive" />
-                        <span className="text-sm text-destructive">
-                          {subdomain}.supportflow.com is already taken
-                        </span>
-                      </>
-                    ) : null}
-                  </div>
-                )}
-
-                {errors.subdomain && (
-                  <p className="text-sm text-destructive">{errors.subdomain.message}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Your workspace URL: https://{subdomain || 'your-org'}.supportflow.com
-                </p>
-              </div>
-
               {/* Phone Number */}
             {/* Terms & Privacy */}
               <div className="space-y-3 pt-2">
@@ -589,7 +464,7 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90"
-                disabled={isSubmitting || (isSubdomainAvailable === false)}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
