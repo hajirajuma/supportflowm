@@ -63,9 +63,7 @@ export default function TenantDetailPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold">{tenant.name}</h1>
-          <p className="text-muted-foreground">
-            {tenant.subdomain}.supportflow.com
-          </p>
+          <p className="text-muted-foreground">{tenant.slug}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Badge className={cn('capitalize', getStatusColor(tenant.status))}>
@@ -98,9 +96,7 @@ export default function TenantDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Organization</p>
                 <p className="font-semibold">{tenant.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {tenant.subdomain}.supportflow.com
-                </p>
+                <p className="text-sm text-muted-foreground">{tenant.slug}</p>
               </div>
             </div>
 

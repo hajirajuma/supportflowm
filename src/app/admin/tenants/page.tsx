@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAdmin } from '@/hooks/use-admin'
 import { TenantTable } from '@/components/admin/tenant-table'
 import { Button } from '@/components/ui/button'
@@ -14,18 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Search, Filter } from 'lucide-react'
+import { Download, Search } from 'lucide-react'
 import { TenantStatus } from '@/types/admin'
 
 export default function TenantsPage() {
+  const router = useRouter()
   const [page, setPage] = useState(1)
-  const [limit] = useState(10)
+  // Fetch up to the backend's max page size so every registered organization
+  // appears in one view instead of hiding behind pagination.
+  const [limit] = useState(100)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [planFilter, setPlanFilter] = useState<string>('all')
 
-  const { useTenants, plans } = useAdmin()
+  const { useTenants, plans, updateTenantStatus, deleteTenant } = useAdmin()
   const { data, isLoading } = useTenants({
     page,
     limit,
@@ -33,6 +35,48 @@ export default function TenantsPage() {
     status: statusFilter !== 'all' ? statusFilter as TenantStatus : undefined,
     plan: planFilter !== 'all' ? planFilter : undefined,
   })
+
+  const handleExport = () => {
+    const rows = data?.data ?? []
+    if (!rows.length) return
+
+    const escape = (value: unknown) =>
+      `"${String(value ?? '').replace(/"/g, '""')}"`
+    const headers = [
+      'Organization',
+      'Slug',
+      'Owner',
+      'Owner Email',
+      'Plan',
+      'Status',
+      'Users',
+      'Tickets',
+      'Created',
+    ]
+    const lines = rows.map((tenant) =>
+      [
+        tenant.name,
+        tenant.slug,
+        `${tenant.owner.firstName} ${tenant.owner.lastName}`.trim(),
+        tenant.owner.email,
+        tenant.plan,
+        tenant.status,
+        tenant.users,
+        tenant.tickets,
+        tenant.createdAt,
+      ]
+        .map(escape)
+        .join(',')
+    )
+    const csv = [headers.map(escape).join(','), ...lines].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'tenants.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="space-y-6">
@@ -44,9 +88,13 @@ export default function TenantsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Filter className="mr-2 h-4 w-4" />
-            Export
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={!data?.data?.length}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
           </Button>
         </div>
       </div>
@@ -99,6 +147,11 @@ export default function TenantsPage() {
             </div>
 
             {/* Table */}
+            {!isLoading && data && (
+              <p className="text-sm text-muted-foreground">
+                Showing {data.data.length} of {data.total} organizations
+              </p>
+            )}
             <TenantTable
               data={data?.data || []}
               total={data?.total || 0}
@@ -106,6 +159,19 @@ export default function TenantsPage() {
               limit={limit}
               onPageChange={setPage}
               isLoading={isLoading}
+              onRowClick={(tenant) => router.push(`/admin/tenants/${tenant.id}`)}
+              onStatusChange={(tenant, status) =>
+                updateTenantStatus({ id: tenant.id, status })
+              }
+              onDelete={(tenant) => {
+                if (
+                  window.confirm(
+                    `Archive "${tenant.name}"? The organization and its data will be deactivated.`
+                  )
+                ) {
+                  deleteTenant(tenant.id)
+                }
+              }}
             />
           </div>
         </CardContent>
