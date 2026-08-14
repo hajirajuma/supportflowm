@@ -71,7 +71,6 @@ export interface InvitationData {
   lastName?: string
   role: UserRole
   organizationName: string
-  subdomain?: string
   expiresAt?: string
   invitedBy?: {
     firstName: string
@@ -100,8 +99,6 @@ export interface RegisterRequest {
   email: string
   password: string
   organizationName: string
-  subdomain: string
-  
 }
 
 export interface RegisterResponse {
@@ -109,16 +106,9 @@ export interface RegisterResponse {
   organization: {
     id: string
     name: string
-    subdomain: string
   }
   accessToken?: string
   refreshToken?: string
   requiresEmailVerification: boolean
   message: string
-}
-
-export interface SubdomainAvailabilityResponse {
-  available: boolean
-  message?: string
-  suggestion?: string
 }

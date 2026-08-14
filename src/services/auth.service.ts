@@ -10,9 +10,8 @@ import {
   RefreshTokenResponse,
   User,
   InvitationData,
-   RegisterRequest,
+  RegisterRequest,
   RegisterResponse,
-  SubdomainAvailabilityResponse
 } from '@/types/auth'
 
 
@@ -163,7 +162,7 @@ export const authService = {
     return response
   },
 
-    // Register new organization
+  // Register new organization
   async register(data: RegisterRequest): Promise<RegisterResponse> {
     const response = await apiClient.post<any>(`${AUTH_BASE}/register`, data)
     return {
@@ -171,7 +170,6 @@ export const authService = {
       organization: response?.organization ?? {
         id: '',
         name: data.organizationName,
-        subdomain: data.subdomain,
       },
       requiresEmailVerification: true,
       message:
@@ -179,12 +177,4 @@ export const authService = {
         'Organization registered successfully. Please verify your email address.',
     }
   },
-
-  // Check subdomain availability
-  async checkSubdomainAvailability(subdomain: string): Promise<SubdomainAvailabilityResponse> {
-    return apiClient.get<SubdomainAvailabilityResponse>(
-      `${AUTH_BASE}/subdomain-availability/${subdomain}`
-    )
-  },
-
 }

@@ -79,10 +79,15 @@ export const useAuthStore = create<AuthStore>()(
 
       setTokens: (accessToken: string, refreshToken: string) => {
         set({ accessToken, refreshToken })
+        // Keep the accessToken cookie in sync whenever tokens are refreshed;
+        // otherwise the middleware keeps seeing the (expired) cookie value and
+        // redirects protected routes (e.g. /admin/tenants) back to /login.
+        setAuthCookies(accessToken, get().roles.map((r) => r.toLowerCase()))
       },
 
       setAccessToken: (accessToken: string) => {
         set({ accessToken })
+        setAuthCookies(accessToken, get().roles.map((r) => r.toLowerCase()))
       },
 
       logout: () => {
@@ -134,6 +139,21 @@ export const useAuthStore = create<AuthStore>()(
         tenantId: state.tenantId,
         registrationData: state.registrationData,
       }),
+      // A persisted session (localStorage) is restored on the client without
+      // going through setAuth, so rewrite the auth cookies on boot. Otherwise
+      // the middleware sees no cookie and bounces the user to /login even
+      // though they are signed in.
+      onRehydrateStorage: () => (state) => {
+        if (typeof window === 'undefined') return
+        if (state?.accessToken) {
+          setAuthCookies(
+            state.accessToken,
+            (state.roles ?? []).map((r: string) => r.toLowerCase())
+          )
+        } else {
+          clearAuthCookies()
+        }
+      },
     }
   )
 )

@@ -176,9 +176,9 @@ export function useAuth() {
   })
 
   // Accept invitation mutation. The accept-invitation page owns the success
-  // state ("Invitation Accepted") and redirects the user to the exact
-  // organization's subdomain login page — we deliberately do NOT create a
-  // session or navigate here, so the user signs in through that tenant.
+  // state ("Invitation Accepted") and redirects the user to the shared
+  // application login page — we deliberately do NOT create a session or
+  // navigate here, so the user signs in on the common URL.
   const acceptInvitationMutation = useMutation({
     mutationFn: (data: AcceptInvitationRequest) => authService.acceptInvitation(data),
   })

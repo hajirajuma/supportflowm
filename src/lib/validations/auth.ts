@@ -80,14 +80,6 @@ export const registerSchema = z
       .string()
       .min(2, 'Organization name must be at least 2 characters')
       .max(100, 'Organization name must not exceed 100 characters'),
-    subdomain: z
-      .string()
-      .min(3, 'Subdomain must be at least 3 characters')
-      .max(30, 'Subdomain must not exceed 30 characters')
-      .regex(
-        /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
-        'Subdomain can only contain lowercase letters, numbers, and hyphens, and must start and end with a letter or number'
-      ),
     phoneNumber: z
       .string()
       .regex(/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number')
