@@ -38,6 +38,9 @@ export function useAdmin() {
     return useQuery({
       queryKey: [...ADMIN_QUERY_KEYS.tenants, filters],
       queryFn: () => adminService.getTenants(filters),
+      // Keep the list in sync with the dashboard metrics so newly registered
+      // organizations appear without a manual refresh.
+      refetchInterval: 60000,
     })
   }
 

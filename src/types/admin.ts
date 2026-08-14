@@ -18,7 +18,6 @@ export interface Tenant {
   id: string
   name: string
   slug: string
-  subdomain: string
   owner: {
     id: string
     firstName: string

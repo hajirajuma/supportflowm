@@ -26,6 +26,43 @@ function normalizeStatus(status: string): TenantStatus {
   return 'active'
 }
 
+const GB_IN_BYTES = 1024 * 1024 * 1024
+
+// The admin UI edits plans with the PlatformPlan shape (slug, limits, feature
+// labels, storage in GB). The backend DTO instead expects code, flat max* limit
+// fields, a boolean feature map and byte-based storage. Translate here so plan
+// create/edit calls pass validation (whitelist + forbidNonWhitelisted).
+function buildPlanPayload(data: Partial<PlatformPlan>): Record<string, unknown> {
+  const limits = data.limits ?? ({} as PlatformPlan['limits'])
+  const rawCode = (data.slug ?? data.name ?? '').trim()
+  const code = rawCode
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  const features = Array.isArray(data.features)
+    ? Object.fromEntries(data.features.map((f) => [f, true]))
+    : data.features
+
+  return {
+    name: data.name,
+    code: code || (data.name ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '_'),
+    description: data.description || undefined,
+    priceMonthly: data.priceMonthly,
+    priceYearly: data.priceYearly,
+    currency: data.currency || 'USD',
+    isActive: data.isActive,
+    trialDays: data.trialDays,
+    maxUsers: limits.users,
+    maxTicketsPerMonth: limits.tickets,
+    maxKnowledgeArticles: limits.knowledgeArticles,
+    maxFeedbackForms: limits.feedbackResponses,
+    storageLimitBytes: Math.round((limits.storage ?? 0) * GB_IN_BYTES),
+    apiMonthlyQuota: limits.apiCalls,
+    features,
+  }
+}
+
 // Backend organization row -> Tenant shape for the admin table.
 function mapTenant(raw: any): Tenant {
   const subscription = Array.isArray(raw.subscriptions) ? raw.subscriptions[0] : undefined
@@ -37,7 +74,6 @@ function mapTenant(raw: any): Tenant {
     id: raw.id,
     name: raw.name,
     slug: raw.slug,
-    subdomain: raw.subdomain,
     owner: owner
       ? {
           id: owner.id,
@@ -110,10 +146,19 @@ export const adminService = {
 
   // Tenants
   async getTenants(filters?: AdminFilters): Promise<{ data: Tenant[]; total: number }> {
-    const raw = await apiClient.get<any>(`${ADMIN_BASE}/organizations`, { params: filters })
+    // The backend stores status as an uppercase enum (ACTIVE/SUSPENDED/...);
+    // the UI sends lowercase. Normalize here so Prisma doesn't reject the value.
+    const params = {
+      ...filters,
+      status: filters?.status ? filters.status.toUpperCase() : undefined,
+    }
+    const raw = await apiClient.get<any>(`${ADMIN_BASE}/organizations`, { params })
+    // api-client normalizes the backend's { items, total } envelope into
+    // { data, total }; accept both shapes.
+    const items = raw?.data ?? raw?.items ?? []
     return {
-      data: (raw?.items ?? []).map(mapTenant),
-      total: raw?.total ?? 0,
+      data: items.map(mapTenant),
+      total: raw?.total ?? items.length ?? 0,
     }
   },
 
@@ -135,8 +180,9 @@ export const adminService = {
   // Users
   async getUsers(filters?: AdminFilters): Promise<{ data: PlatformUser[]; total: number }> {
     const raw = await apiClient.get<any>(`${ADMIN_BASE}/users`, { params: filters })
+    const items = raw?.data ?? raw?.items ?? []
     return {
-      data: (raw?.items ?? []).map((u: any) => ({
+      data: items.map((u: any) => ({
         id: u.id,
         firstName: u.firstName,
         lastName: u.lastName,
@@ -150,7 +196,7 @@ export const adminService = {
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
       })),
-      total: raw?.total ?? 0,
+      total: raw?.total ?? items.length ?? 0,
     }
   },
 
@@ -181,8 +227,9 @@ export const adminService = {
   // Subscriptions
   async getSubscriptions(filters?: AdminFilters): Promise<{ data: PlatformSubscription[]; total: number }> {
     const raw = await apiClient.get<any>(`${ADMIN_BASE}/subscriptions`, { params: filters })
+    const items = raw?.data ?? raw?.items ?? []
     return {
-      data: (raw?.items ?? []).map((s: any) => ({
+      data: items.map((s: any) => ({
         id: s.id,
         organization: {
           id: s.organization?.id,
@@ -201,7 +248,7 @@ export const adminService = {
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
       })),
-      total: raw?.total ?? 0,
+      total: raw?.total ?? items.length ?? 0,
     }
   },
 
@@ -244,8 +291,11 @@ export const adminService = {
       name: p.name,
       slug: p.code?.toLowerCase() ?? '',
       description: p.description ?? '',
-      priceMonthly: p.priceMonthly ?? 0,
-      priceYearly: p.priceYearly ?? 0,
+      // Backend returns Decimal prices as strings and storageLimitBytes as a
+      // BigInt-serialized number (bytes). Coerce to numbers and convert the
+      // storage limit to GB, which is what the plan editor form uses.
+      priceMonthly: Number(p.priceMonthly ?? 0),
+      priceYearly: Number(p.priceYearly ?? 0),
       currency: p.currency ?? 'USD',
       features: Array.isArray(p.features)
         ? Object.entries(p.features)
@@ -255,7 +305,7 @@ export const adminService = {
       limits: {
         users: p.maxUsers ?? 0,
         tickets: p.maxTicketsPerMonth ?? 0,
-        storage: Number(p.storageLimitBytes ?? 0),
+        storage: Number(p.storageLimitBytes ?? 0) / 1073741824,
         apiCalls: p.apiMonthlyQuota ?? 0,
         departments: 0,
         feedbackResponses: p.maxFeedbackForms ?? 0,
@@ -275,27 +325,14 @@ export const adminService = {
   },
 
   async createPlan(data: Omit<PlatformPlan, 'id' | 'createdAt' | 'updatedAt'>): Promise<PlatformPlan> {
-    const payload = {
-      name: data.name,
-      code: (data.slug ?? data.name).toUpperCase(),
-      description: data.description,
-      priceMonthly: data.priceMonthly,
-      priceYearly: data.priceYearly,
-      currency: data.currency,
-      maxUsers: data.limits?.users,
-      maxTicketsPerMonth: data.limits?.tickets,
-      maxKnowledgeArticles: data.limits?.knowledgeArticles,
-      maxFeedbackForms: data.limits?.feedbackResponses,
-      storageLimitBytes: data.limits?.storage,
-      apiMonthlyQuota: data.limits?.apiCalls,
-      trialDays: data.trialDays,
-      isActive: data.isActive,
-    }
-    return apiClient.post(`${ADMIN_BASE}/subscriptions/plans`, payload)
+    return apiClient.post(`${ADMIN_BASE}/subscriptions/plans`, buildPlanPayload(data))
   },
 
   async updatePlan(id: string, data: Partial<PlatformPlan>): Promise<PlatformPlan> {
-    return apiClient.patch(`${ADMIN_BASE}/subscriptions/plans/${id}`, data)
+    const payload = buildPlanPayload(data)
+    // Plan code is immutable once created.
+    delete payload.code
+    return apiClient.patch(`${ADMIN_BASE}/subscriptions/plans/${id}`, payload)
   },
 
   async deletePlan(id: string): Promise<{ message: string }> {
@@ -313,8 +350,9 @@ export const adminService = {
     dateTo?: string
   }): Promise<{ data: AuditLog[]; total: number; page: number; limit: number }> {
     const raw = await apiClient.get<any>(`${ADMIN_BASE}/audit-logs`, { params: filters })
+    const items = raw?.data ?? raw?.items ?? []
     return {
-      data: (raw?.items ?? []).map((l: any) => ({
+      data: items.map((l: any) => ({
         id: l.id,
         user: {
           id: l.actorId ?? '',
@@ -331,7 +369,7 @@ export const adminService = {
         metadata: l.metadata,
         createdAt: l.createdAt,
       })),
-      total: raw?.total ?? 0,
+      total: raw?.total ?? items.length ?? 0,
       page: raw?.page ?? 1,
       limit: raw?.limit ?? filters?.limit ?? 10,
     }
