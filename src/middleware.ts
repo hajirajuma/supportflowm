@@ -8,7 +8,6 @@ const publicRoutes = [
   '/pricing',
   '/about',
   '/contact',
-  '/help',
   '/login',
   '/register',
   '/forgot-password',
@@ -90,10 +89,18 @@ export function middleware(request: NextRequest) {
   // Check if route is auth route
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
 
-  // A token cookie only counts as "authenticated" while the JWT is valid;
-  // an expired token must not force users away from /login (redirect loop).
-  const authenticated = isTokenValid(request)
-  const effectiveRole = authenticated ? role : null
+  // Any accessToken cookie (even an expired JWT) proves the user has a
+  // session. Token refresh is the client's job (401 -> refresh -> retry), so
+  // middleware must not hard-bounce a signed-in user whose JWT simply lapsed
+  // mid-use — that is what used to send platform admins from /admin/tenants
+  // back to /login. Only a missing session cookie redirects to login.
+  const hasSessionCookie = !!request.cookies.get('accessToken')?.value
+
+  // A cookie only counts as strictly "authenticated" while the JWT is valid.
+  // Auth routes (login/forgot/reset) still use the strict check so an expired
+  // session can always reach /login instead of looping login -> dashboard.
+  const authenticated = hasSessionCookie && isTokenValid(request)
+  const effectiveRole = role
 
   // Authenticated users hitting auth routes (login/forgot/reset) go straight
   // to their role-specific dashboard. The marketing root "/" stays public.
@@ -101,8 +108,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(roleHome[effectiveRole], request.url))
   }
 
-  // If not authenticated and trying to access protected route
-  if (!authenticated && !isPublicRoute) {
+  // If there is no session at all and the route is protected, send them to
+  // login (with a return path so they land back here after signing in).
+  if (!hasSessionCookie && !isPublicRoute) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
@@ -111,7 +119,7 @@ export function middleware(request: NextRequest) {
   // Role-based protection: only enforce when the path lives under a
   // role-specific prefix, so shared authenticated pages (notifications, etc.)
   // keep working.
-  if (authenticated && effectiveRole && !isPublicRoute) {
+  if (effectiveRole && !isPublicRoute) {
     const isRoleScopedPath = Object.values(roleRoutes)
       .flat()
       .some((route) => {

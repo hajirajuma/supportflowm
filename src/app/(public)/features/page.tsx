@@ -126,10 +126,10 @@ const features = [
         icon: Shield,
       },
       {
-        title: 'Subdomain Support',
-        description: 'Each organization gets their own subdomain for a branded customer experience.',
-        benefits: ['Branding', 'Isolation', 'Professional appearance'],
-        businessValue: 'Strengthen brand presence',
+        title: 'Secure Multi-Tenant Isolation',
+        description: 'Every organization gets fully isolated data on one shared application URL, with tenant boundaries enforced server-side.',
+        benefits: ['Data isolation', 'One application URL', 'Enterprise-grade security'],
+        businessValue: 'Scale confidently with strong tenant isolation',
         icon: Globe,
       },
       {

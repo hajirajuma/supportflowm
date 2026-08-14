@@ -141,8 +141,8 @@ export default function OrganizationOverviewPage() {
             <div className="flex items-center gap-3">
               <Activity className="h-8 w-8 text-primary" />
               <div>
-                <p className="text-sm text-muted-foreground">Subdomain</p>
-                <p className="font-semibold">{organization.subdomain}.supportflow.com</p>
+                <p className="text-sm text-muted-foreground">Slug</p>
+                <p className="font-semibold">{organization.slug}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
